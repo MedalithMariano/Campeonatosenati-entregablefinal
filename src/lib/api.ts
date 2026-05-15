@@ -175,6 +175,111 @@ export interface RosterValidation {
   aboveMax: boolean;
 }
 
+export type PhaseType =
+  | "LEAGUE"
+  | "GROUP_STAGE"
+  | "ROUND_OF_16"
+  | "QUARTERFINAL"
+  | "SEMIFINAL"
+  | "FINAL"
+  | "THIRD_PLACE";
+
+export type MatchStatus =
+  | "SCHEDULED"
+  | "LIVE"
+  | "FINISHED"
+  | "POSTPONED"
+  | "CANCELLED";
+
+export interface Phase {
+  id: string;
+  tournamentId: string;
+  name: string;
+  type: PhaseType;
+  order: number;
+  legs: number;
+  createdAt: string;
+}
+
+export interface Group {
+  id: string;
+  phaseId: string;
+  name: string;
+  capacity: number;
+  createdAt: string;
+}
+
+export interface GroupTeam {
+  id: string;
+  groupId: string;
+  teamId: string;
+  seed: number | null;
+  createdAt: string;
+  team?: Team;
+}
+
+export interface MatchDay {
+  id: string;
+  phaseId: string;
+  number: number;
+  date: string | null;
+}
+
+export interface Match {
+  id: string;
+  tournamentId: string;
+  phaseId: string;
+  groupId: string | null;
+  matchDayId: string | null;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
+  parentHomeMatchId: string | null;
+  parentAwayMatchId: string | null;
+  bracketRound: number | null;
+  bracketPosition: number | null;
+  kickoff: string | null;
+  venue: string | null;
+  status: MatchStatus;
+  homeScore: number | null;
+  awayScore: number | null;
+  homePenalties: number | null;
+  awayPenalties: number | null;
+  createdAt: string;
+  updatedAt: string;
+  homeTeam?: Team | null;
+  awayTeam?: Team | null;
+  phase?: Phase;
+  group?: Group | null;
+  matchDay?: MatchDay | null;
+}
+
+export interface CreatePhasePayload {
+  name: string;
+  type: PhaseType;
+  order: number;
+  legs?: number;
+}
+
+export interface CreateGroupPayload {
+  name: string;
+  capacity?: number;
+}
+
+export interface UpdateMatchPayload {
+  kickoff?: string | null;
+  venue?: string | null;
+  status?: MatchStatus;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  homePenalties?: number | null;
+  awayPenalties?: number | null;
+}
+
+export interface GenerateFixtureResult {
+  phasesCreated: number;
+  matchesCreated: number;
+}
+
 export interface CreateTeamPayload {
   name: string;
   shortName?: string;
@@ -472,6 +577,113 @@ export const api = {
         headers: authHeader(token),
       },
     );
+  },
+
+  // ---- Phases ----
+  listPhases(tournamentId: string) {
+    return request<Phase[]>(`/tournaments/${tournamentId}/phases`);
+  },
+
+  createPhase(token: string, tournamentId: string, payload: CreatePhasePayload) {
+    return request<Phase>(`/tournaments/${tournamentId}/phases`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deletePhase(token: string, tournamentId: string, phaseId: string) {
+    return request<null>(`/tournaments/${tournamentId}/phases/${phaseId}`, {
+      method: "DELETE",
+      headers: authHeader(token),
+    });
+  },
+
+  // ---- Groups ----
+  listGroups(phaseId: string) {
+    return request<Group[]>(`/phases/${phaseId}/groups`);
+  },
+
+  createGroup(token: string, phaseId: string, payload: CreateGroupPayload) {
+    return request<Group>(`/phases/${phaseId}/groups`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteGroup(token: string, phaseId: string, groupId: string) {
+    return request<null>(`/phases/${phaseId}/groups/${groupId}`, {
+      method: "DELETE",
+      headers: authHeader(token),
+    });
+  },
+
+  listGroupTeams(phaseId: string, groupId: string) {
+    return request<GroupTeam[]>(`/phases/${phaseId}/groups/${groupId}/teams`);
+  },
+
+  assignTeamToGroup(
+    token: string,
+    phaseId: string,
+    groupId: string,
+    teamId: string,
+  ) {
+    return request<GroupTeam>(`/phases/${phaseId}/groups/${groupId}/teams`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify({ teamId }),
+    });
+  },
+
+  unassignTeamFromGroup(
+    token: string,
+    phaseId: string,
+    groupId: string,
+    teamId: string,
+  ) {
+    return request<null>(
+      `/phases/${phaseId}/groups/${groupId}/teams/${teamId}`,
+      {
+        method: "DELETE",
+        headers: authHeader(token),
+      },
+    );
+  },
+
+  // ---- Fixture ----
+  generateFixture(token: string, tournamentId: string) {
+    return request<GenerateFixtureResult>(
+      `/tournaments/${tournamentId}/fixture/generate`,
+      {
+        method: "POST",
+        headers: authHeader(token),
+      },
+    );
+  },
+
+  dropFixture(token: string, tournamentId: string) {
+    return request<null>(`/tournaments/${tournamentId}/fixture`, {
+      method: "DELETE",
+      headers: authHeader(token),
+    });
+  },
+
+  // ---- Matches ----
+  listMatches(tournamentId: string) {
+    return request<Match[]>(`/tournaments/${tournamentId}/matches`);
+  },
+
+  getMatch(matchId: string) {
+    return request<Match>(`/matches/${matchId}`);
+  },
+
+  updateMatch(token: string, matchId: string, payload: UpdateMatchPayload) {
+    return request<Match>(`/matches/${matchId}`, {
+      method: "PATCH",
+      headers: authHeader(token),
+      body: JSON.stringify(payload),
+    });
   },
 };
 

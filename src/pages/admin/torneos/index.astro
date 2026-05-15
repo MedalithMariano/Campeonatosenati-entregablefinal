@@ -191,6 +191,12 @@ import { Plus } from "@lucide/astro";
         "inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
       teamsLink.textContent = "Inscripciones";
 
+      const fixtureLink = document.createElement("a");
+      fixtureLink.href = `/admin/torneos/fixture?id=${encodeURIComponent(t.id)}`;
+      fixtureLink.className =
+        "inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
+      fixtureLink.textContent = "Fixture";
+
       const editLink = document.createElement("a");
       editLink.href = `/admin/torneos/editar?id=${encodeURIComponent(t.id)}`;
       editLink.className =
@@ -214,7 +220,7 @@ import { Plus } from "@lucide/astro";
 
       const actions = document.createElement("div");
       actions.className = "flex items-center gap-2";
-      actions.append(teamsLink, editLink, delBtn);
+      actions.append(teamsLink, fixtureLink, editLink, delBtn);
 
       li.append(meta, actions);
       return li;
