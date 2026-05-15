@@ -1,0 +1,72 @@
+---
+import { Home, Shield, Users as UsersIcon, Settings, LogIn } from "@lucide/astro";
+---
+
+<header class="border-b border-slate-200 bg-white">
+  <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
+    <a href="/" class="flex items-center gap-2 text-sm font-semibold text-slate-900">
+      <Home size={18} />
+      Campeonato
+    </a>
+
+    <ul class="flex items-center gap-1 text-sm">
+      <li>
+        <a
+          href="/equipos"
+          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+        >
+          <Shield size={16} />
+          Equipos
+        </a>
+      </li>
+      <li>
+        <a
+          href="/jugadores"
+          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+        >
+          <UsersIcon size={16} />
+          Jugadores
+        </a>
+      </li>
+      <li id="nav-admin" hidden>
+        <a
+          href="/admin"
+          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-indigo-700 hover:bg-indigo-50"
+        >
+          <Settings size={16} />
+          Admin
+        </a>
+      </li>
+      <li id="nav-me" hidden>
+        <a
+          href="/me"
+          class="inline-flex items-center rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+        >
+          Mi perfil
+        </a>
+      </li>
+      <li id="nav-login">
+        <a
+          href="/login"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-white hover:bg-slate-800"
+        >
+          <LogIn size={14} />
+          Iniciar sesión
+        </a>
+      </li>
+    </ul>
+  </nav>
+</header>
+
+<script>
+  import { auth } from "../lib/api";
+
+  const user = auth.getUser();
+  if (user) {
+    document.getElementById("nav-login")!.hidden = true;
+    document.getElementById("nav-me")!.hidden = false;
+    if (user.role === "ADMIN") {
+      document.getElementById("nav-admin")!.hidden = false;
+    }
+  }
+</script>

@@ -1,9 +1,12 @@
 const API_URL = import.meta.env.PUBLIC_API_URL ?? "http://localhost:3000";
 const TOKEN_KEY = "auth_token";
 
+export type UserRole = "ADMIN" | "USER";
+
 export interface AuthUser {
   id: string;
   email: string;
+  role: UserRole;
 }
 
 export interface Profile {
@@ -51,6 +54,75 @@ export interface UpdateProfilePayload {
   birthDate?: string | null;
 }
 
+export type DocumentType = "DNI" | "CE" | "PASAPORTE" | "RUC";
+export type PlayerPosition = "GK" | "DEF" | "MID" | "FWD";
+export type PreferredFoot = "LEFT" | "RIGHT" | "BOTH";
+
+export interface Team {
+  id: string;
+  name: string;
+  shortName: string | null;
+  city: string | null;
+  foundedYear: number | null;
+  primaryColor: string | null;
+  logoUrl: string | null;
+  logoPublicId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Player {
+  id: string;
+  firstName: string;
+  lastName: string;
+  documentType: DocumentType;
+  documentNumber: string;
+  birthDate: string;
+  position: PlayerPosition;
+  preferredFoot: PreferredFoot | null;
+  nationality: string | null;
+  photoUrl: string | null;
+  photoPublicId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UploadedImage {
+  url: string;
+  publicId: string;
+  width: number;
+  height: number;
+  bytes: number;
+  format: string;
+}
+
+export interface CreateTeamPayload {
+  name: string;
+  shortName?: string;
+  city?: string;
+  foundedYear?: number;
+  primaryColor?: string;
+  logoUrl?: string;
+  logoPublicId?: string;
+}
+
+export type UpdateTeamPayload = Partial<CreateTeamPayload>;
+
+export interface CreatePlayerPayload {
+  firstName: string;
+  lastName: string;
+  documentType: DocumentType;
+  documentNumber: string;
+  birthDate: string;
+  position: PlayerPosition;
+  preferredFoot?: PreferredFoot;
+  nationality?: string;
+  photoUrl?: string;
+  photoPublicId?: string;
+}
+
+export type UpdatePlayerPayload = Partial<CreatePlayerPayload>;
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -61,12 +133,15 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...init,
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...(init.headers ?? {}),
       },
     });
@@ -88,6 +163,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   return body as T;
+}
+
+function authHeader(token: string) {
+  return { Authorization: `Bearer ${token}` };
 }
 
 export const api = {
@@ -114,11 +193,108 @@ export const api = {
   updateMe(token: string, payload: UpdateProfilePayload) {
     return request<MeResponse>("/auth/me", {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: authHeader(token),
       body: JSON.stringify(payload),
     });
   },
+
+  // ---- Teams ----
+  listTeams() {
+    return request<Team[]>("/teams");
+  },
+
+  getTeam(id: string) {
+    return request<Team>(`/teams/${id}`);
+  },
+
+  createTeam(token: string, payload: CreateTeamPayload) {
+    return request<Team>("/teams", {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateTeam(token: string, id: string, payload: UpdateTeamPayload) {
+    return request<Team>(`/teams/${id}`, {
+      method: "PATCH",
+      headers: authHeader(token),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteTeam(token: string, id: string) {
+    return request<null>(`/teams/${id}`, {
+      method: "DELETE",
+      headers: authHeader(token),
+    });
+  },
+
+  // ---- Players ----
+  listPlayers() {
+    return request<Player[]>("/players");
+  },
+
+  getPlayer(id: string) {
+    return request<Player>(`/players/${id}`);
+  },
+
+  createPlayer(token: string, payload: CreatePlayerPayload) {
+    return request<Player>("/players", {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updatePlayer(token: string, id: string, payload: UpdatePlayerPayload) {
+    return request<Player>(`/players/${id}`, {
+      method: "PATCH",
+      headers: authHeader(token),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deletePlayer(token: string, id: string) {
+    return request<null>(`/players/${id}`, {
+      method: "DELETE",
+      headers: authHeader(token),
+    });
+  },
+
+  // ---- Uploads ----
+  uploadImage(
+    token: string,
+    file: File,
+    folder: "teams" | "players" | "tournaments",
+  ) {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("folder", folder);
+    return request<UploadedImage>("/uploads/image", {
+      method: "POST",
+      headers: authHeader(token),
+      body: fd,
+    });
+  },
 };
+
+interface JwtClaims {
+  sub: string;
+  email: string;
+  role: UserRole;
+  exp?: number;
+}
+
+function decodeJwt(token: string): JwtClaims | null {
+  try {
+    const payload = token.split(".")[1];
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(json) as JwtClaims;
+  } catch {
+    return null;
+  }
+}
 
 export const auth = {
   saveToken(token: string) {
@@ -129,6 +305,20 @@ export const auth = {
   },
   clearToken() {
     localStorage.removeItem(TOKEN_KEY);
+  },
+  getUser(): AuthUser | null {
+    const token = this.getToken();
+    if (!token) return null;
+    const claims = decodeJwt(token);
+    if (!claims) return null;
+    if (claims.exp && claims.exp * 1000 < Date.now()) {
+      this.clearToken();
+      return null;
+    }
+    return { id: claims.sub, email: claims.email, role: claims.role };
+  },
+  isAdmin(): boolean {
+    return this.getUser()?.role === "ADMIN";
   },
   redirectIfAuthenticated(target = "/me") {
     if (this.getToken()) window.location.href = target;
@@ -141,4 +331,26 @@ export const auth = {
     }
     return token;
   },
+  requireAdmin(loginPath = "/login", forbiddenPath = "/"): string | null {
+    const token = this.requireAuth(loginPath);
+    if (!token) return null;
+    if (!this.isAdmin()) {
+      window.location.href = forbiddenPath;
+      return null;
+    }
+    return token;
+  },
 };
+
+const CLOUDINARY_BASE = "/upload/";
+
+export function cloudinaryUrl(
+  url: string | null | undefined,
+  transform: string,
+): string | null {
+  if (!url) return null;
+  const idx = url.indexOf(CLOUDINARY_BASE);
+  if (idx === -1) return url;
+  const insertAt = idx + CLOUDINARY_BASE.length;
+  return `${url.slice(0, insertAt)}${transform}/${url.slice(insertAt)}`;
+}

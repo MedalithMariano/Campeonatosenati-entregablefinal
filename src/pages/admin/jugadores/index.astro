@@ -1,0 +1,316 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import Field from "../../../components/Field.astro";
+import Select from "../../../components/Select.astro";
+import Alert from "../../../components/Alert.astro";
+import { Plus } from "@lucide/astro";
+---
+
+<Layout title="Admin · Jugadores">
+  <main class="mx-auto max-w-5xl px-6 py-10">
+    <header class="flex items-center justify-between">
+      <div>
+        <p class="text-sm font-medium text-indigo-600">Administración</p>
+        <h1 class="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+          Jugadores
+        </h1>
+      </div>
+      <button
+        type="button"
+        id="toggle-form"
+        class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700"
+      >
+        <Plus size={16} />
+        Nuevo jugador
+      </button>
+    </header>
+
+    <section
+      id="form-section"
+      hidden
+      class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-100 px-6 py-4">
+        <h2 class="text-base font-semibold text-slate-900">Crear jugador</h2>
+      </div>
+      <form id="create-form" class="space-y-5 px-6 py-5" novalidate>
+        <Alert id="create-error" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="firstName" label="Nombres" required />
+          <Field id="lastName" label="Apellidos" required />
+        </div>
+
+        <div class="grid grid-cols-[1fr_1.4fr] gap-3">
+          <Select
+            id="documentType"
+            label="Tipo de doc."
+            options={[
+              { value: "DNI", label: "DNI" },
+              { value: "CE", label: "Carnet de extranjería" },
+              { value: "PASAPORTE", label: "Pasaporte" },
+              { value: "RUC", label: "RUC" },
+            ]}
+            required
+          />
+          <Field id="documentNumber" label="Número" required />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="birthDate" label="Fecha de nacimiento" type="date" required />
+          <Select
+            id="position"
+            label="Posición"
+            options={[
+              { value: "GK", label: "Portero" },
+              { value: "DEF", label: "Defensa" },
+              { value: "MID", label: "Centrocampista" },
+              { value: "FWD", label: "Delantero" },
+            ]}
+            required
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <Select
+            id="preferredFoot"
+            label="Pie hábil"
+            options={[
+              { value: "", label: "—" },
+              { value: "RIGHT", label: "Derecho" },
+              { value: "LEFT", label: "Izquierdo" },
+              { value: "BOTH", label: "Ambidiestro" },
+            ]}
+          />
+          <Field id="nationality" label="Nacionalidad" placeholder="Ej. Peruano" />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="photo" class="block text-sm font-medium text-slate-700">
+            Foto <span class="text-slate-400 font-normal">· opcional</span>
+          </label>
+          <input
+            id="photo"
+            name="photo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-slate-700"
+          />
+        </div>
+
+        <div class="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            id="cancel-btn"
+            class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            id="submit-btn"
+            class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+          >
+            Crear
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section
+      id="loading"
+      class="mt-8 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <ul
+      id="list"
+      hidden
+      class="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-100"
+    >
+    </ul>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    auth,
+    ApiError,
+    cloudinaryUrl,
+    type Player,
+    type CreatePlayerPayload,
+  } from "../../../lib/api";
+
+  const POSITION_LABEL: Record<Player["position"], string> = {
+    GK: "Portero",
+    DEF: "Defensa",
+    MID: "Centrocampista",
+    FWD: "Delantero",
+  };
+
+  const token = auth.requireAdmin();
+  if (!token) {
+    // requireAdmin redirected
+  } else {
+    const loading = document.getElementById("loading") as HTMLElement;
+    const list = document.getElementById("list") as HTMLUListElement;
+    const toggleBtn = document.getElementById("toggle-form") as HTMLButtonElement;
+    const formSection = document.getElementById("form-section") as HTMLElement;
+    const form = document.getElementById("create-form") as HTMLFormElement;
+    const errorBox = document.getElementById("create-error") as HTMLElement;
+    const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+    const cancelBtn = document.getElementById("cancel-btn") as HTMLButtonElement;
+
+    function showError(messages: string[]) {
+      errorBox.replaceChildren(
+        ...messages.map((m) => {
+          const d = document.createElement("div");
+          d.textContent = m;
+          return d;
+        }),
+      );
+      errorBox.hidden = false;
+    }
+    function clearError() {
+      errorBox.hidden = true;
+      errorBox.replaceChildren();
+    }
+
+    function renderRow(p: Player): HTMLLIElement {
+      const li = document.createElement("li");
+      li.className = "flex items-center gap-4 px-5 py-4";
+
+      const avatar = document.createElement("div");
+      avatar.className =
+        "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xs font-semibold text-slate-500";
+      const photo = cloudinaryUrl(p.photoUrl, "w_80,h_80,c_fill,g_face,q_auto,f_auto");
+      if (photo) {
+        const img = document.createElement("img");
+        img.src = photo;
+        img.alt = `${p.firstName} ${p.lastName}`;
+        img.className = "h-full w-full object-cover";
+        avatar.appendChild(img);
+      } else {
+        avatar.textContent = `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`.toUpperCase();
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "min-w-0 flex-1";
+      const name = document.createElement("p");
+      name.className = "truncate font-medium text-slate-900";
+      name.textContent = `${p.firstName} ${p.lastName}`;
+      const sub = document.createElement("p");
+      sub.className = "truncate text-xs text-slate-500";
+      sub.textContent = [
+        POSITION_LABEL[p.position],
+        `${p.documentType} ${p.documentNumber}`,
+      ].join(" · ");
+      meta.append(name, sub);
+
+      const editLink = document.createElement("a");
+      editLink.href = `/admin/jugadores/editar?id=${encodeURIComponent(p.id)}`;
+      editLink.className =
+        "inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
+      editLink.textContent = "Editar";
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className =
+        "inline-flex items-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50";
+      delBtn.textContent = "Eliminar";
+      delBtn.addEventListener("click", async () => {
+        if (!confirm(`¿Eliminar al jugador "${p.firstName} ${p.lastName}"?`))
+          return;
+        try {
+          await api.deletePlayer(token, p.id);
+          await refresh();
+        } catch (err) {
+          alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+        }
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "flex items-center gap-2";
+      actions.append(editLink, delBtn);
+
+      li.append(avatar, meta, actions);
+      return li;
+    }
+
+    async function refresh() {
+      loading.hidden = false;
+      list.hidden = true;
+      try {
+        const players = await api.listPlayers();
+        loading.hidden = true;
+        list.replaceChildren(...players.map(renderRow));
+        list.hidden = false;
+      } catch (err) {
+        loading.textContent =
+          err instanceof ApiError ? err.messages.join(" · ") : "Error al cargar";
+      }
+    }
+
+    toggleBtn.addEventListener("click", () => {
+      formSection.hidden = !formSection.hidden;
+      clearError();
+      if (!formSection.hidden) form.reset();
+    });
+    cancelBtn.addEventListener("click", () => {
+      formSection.hidden = true;
+      form.reset();
+      clearError();
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearError();
+      const fd = new FormData(form);
+      const file = (fd.get("photo") as File | null) ?? null;
+      const preferredFoot = String(fd.get("preferredFoot") ?? "").trim();
+
+      const payload: CreatePlayerPayload = {
+        firstName: String(fd.get("firstName") ?? "").trim(),
+        lastName: String(fd.get("lastName") ?? "").trim(),
+        documentType: fd.get("documentType") as CreatePlayerPayload["documentType"],
+        documentNumber: String(fd.get("documentNumber") ?? "").trim(),
+        birthDate: String(fd.get("birthDate") ?? ""),
+        position: fd.get("position") as CreatePlayerPayload["position"],
+        ...(preferredFoot && {
+          preferredFoot: preferredFoot as CreatePlayerPayload["preferredFoot"],
+        }),
+        ...(String(fd.get("nationality") ?? "").trim() && {
+          nationality: String(fd.get("nationality")).trim(),
+        }),
+      };
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creando…";
+
+      try {
+        if (file && file.size > 0) {
+          submitBtn.textContent = "Subiendo foto…";
+          const upload = await api.uploadImage(token, file, "players");
+          payload.photoUrl = upload.url;
+          payload.photoPublicId = upload.publicId;
+        }
+        submitBtn.textContent = "Guardando…";
+        await api.createPlayer(token, payload);
+        formSection.hidden = true;
+        form.reset();
+        await refresh();
+      } catch (err) {
+        showError(
+          err instanceof ApiError ? err.messages : ["Error inesperado"],
+        );
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Crear";
+      }
+    });
+
+    await refresh();
+  }
+</script>

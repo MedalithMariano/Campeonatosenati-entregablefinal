@@ -1,0 +1,205 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import Field from "../../../components/Field.astro";
+import Alert from "../../../components/Alert.astro";
+---
+
+<Layout title="Admin · Editar equipo">
+  <main class="mx-auto max-w-3xl px-6 py-10">
+    <a
+      href="/admin/equipos"
+      class="text-sm text-slate-500 hover:text-slate-700"
+    >← Volver a equipos</a>
+
+    <section
+      id="loading"
+      class="mt-8 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section
+      id="content"
+      hidden
+      class="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-100 px-6 py-4">
+        <h1 class="text-base font-semibold text-slate-900">Editar equipo</h1>
+      </div>
+      <form id="edit-form" class="space-y-5 px-6 py-5" novalidate>
+        <Alert id="edit-error" />
+        <Alert id="edit-success" variant="success" />
+
+        <div class="flex items-center gap-4">
+          <div
+            id="current-logo"
+            class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-base font-semibold text-slate-500"
+          >
+          </div>
+          <div class="text-xs text-slate-500">Escudo actual</div>
+        </div>
+
+        <Field id="name" label="Nombre" required />
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="shortName" label="Abreviatura" />
+          <Field id="city" label="Ciudad" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="foundedYear" label="Año de fundación" type="number" />
+          <Field id="primaryColor" label="Color principal" type="color" />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="logo" class="block text-sm font-medium text-slate-700">
+            Reemplazar escudo <span class="text-slate-400 font-normal">· opcional</span>
+          </label>
+          <input
+            id="logo"
+            name="logo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-slate-700"
+          />
+        </div>
+
+        <div class="flex items-center justify-end gap-2">
+          <button
+            type="submit"
+            id="save-btn"
+            class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+          >
+            Guardar cambios
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    auth,
+    ApiError,
+    cloudinaryUrl,
+    type UpdateTeamPayload,
+  } from "../../../lib/api";
+
+  const token = auth.requireAdmin();
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+
+  if (token && id) {
+    const form = document.getElementById("edit-form") as HTMLFormElement;
+    const errorBox = document.getElementById("edit-error") as HTMLElement;
+    const successBox = document.getElementById("edit-success") as HTMLElement;
+    const saveBtn = document.getElementById("save-btn") as HTMLButtonElement;
+    const currentLogo = document.getElementById("current-logo") as HTMLElement;
+
+    function setMessages(el: HTMLElement, messages: string[]) {
+      el.replaceChildren(
+        ...messages.map((m) => {
+          const d = document.createElement("div");
+          d.textContent = m;
+          return d;
+        }),
+      );
+      el.hidden = false;
+    }
+    function clearMessages(el: HTMLElement) {
+      el.hidden = true;
+      el.replaceChildren();
+    }
+
+    try {
+      const team = await api.getTeam(id);
+
+      (form.elements.namedItem("name") as HTMLInputElement).value = team.name;
+      (form.elements.namedItem("shortName") as HTMLInputElement).value =
+        team.shortName ?? "";
+      (form.elements.namedItem("city") as HTMLInputElement).value = team.city ?? "";
+      (form.elements.namedItem("foundedYear") as HTMLInputElement).value =
+        team.foundedYear ? String(team.foundedYear) : "";
+      (form.elements.namedItem("primaryColor") as HTMLInputElement).value =
+        team.primaryColor ?? "#4f46e5";
+
+      const logo = cloudinaryUrl(team.logoUrl, "w_128,h_128,c_fill,q_auto,f_auto");
+      if (logo) {
+        const img = document.createElement("img");
+        img.src = logo;
+        img.alt = team.name;
+        img.className = "h-full w-full object-cover";
+        currentLogo.replaceChildren(img);
+      } else {
+        currentLogo.textContent = team.name[0]?.toUpperCase() ?? "?";
+      }
+
+      loading.hidden = true;
+      content.hidden = false;
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearMessages(errorBox);
+        clearMessages(successBox);
+
+        const fd = new FormData(form);
+        const file = (fd.get("logo") as File | null) ?? null;
+
+        const payload: UpdateTeamPayload = {
+          name: String(fd.get("name") ?? "").trim(),
+          shortName: String(fd.get("shortName") ?? "").trim() || undefined,
+          city: String(fd.get("city") ?? "").trim() || undefined,
+          foundedYear: Number(fd.get("foundedYear")) || undefined,
+          primaryColor: String(fd.get("primaryColor") ?? "").trim() || undefined,
+        };
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Guardando…";
+
+        try {
+          if (file && file.size > 0) {
+            saveBtn.textContent = "Subiendo escudo…";
+            const upload = await api.uploadImage(token, file, "teams");
+            payload.logoUrl = upload.url;
+            payload.logoPublicId = upload.publicId;
+          }
+          saveBtn.textContent = "Guardando…";
+          const updated = await api.updateTeam(token, id, payload);
+
+          const newLogo = cloudinaryUrl(
+            updated.logoUrl,
+            "w_128,h_128,c_fill,q_auto,f_auto",
+          );
+          if (newLogo) {
+            const img = document.createElement("img");
+            img.src = newLogo;
+            img.alt = updated.name;
+            img.className = "h-full w-full object-cover";
+            currentLogo.replaceChildren(img);
+          }
+          (form.elements.namedItem("logo") as HTMLInputElement).value = "";
+
+          setMessages(successBox, ["Equipo actualizado"]);
+        } catch (err) {
+          setMessages(
+            errorBox,
+            err instanceof ApiError ? err.messages : ["Error inesperado"],
+          );
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Guardar cambios";
+        }
+      });
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error";
+    }
+  } else if (!id) {
+    loading.textContent = "Falta el id del equipo";
+  }
+</script>

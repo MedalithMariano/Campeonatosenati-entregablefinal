@@ -1,0 +1,150 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { IdCard, Footprints, Flag, CalendarDays, Trophy } from "@lucide/astro";
+---
+
+<Layout title="Jugador">
+  <main class="mx-auto max-w-3xl px-6 py-10">
+    <a
+      href="/jugadores"
+      class="text-sm text-slate-500 hover:text-slate-700"
+    >← Volver a jugadores</a>
+
+    <section
+      id="loading"
+      class="mt-8 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section
+      id="content"
+      hidden
+      class="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="flex items-center gap-5 border-b border-slate-100 p-6">
+        <div
+          id="photo"
+          class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xl font-semibold text-slate-500"
+        >
+        </div>
+        <div class="min-w-0">
+          <h1 id="full-name" class="truncate text-2xl font-semibold text-slate-900"></h1>
+          <p id="position-label" class="text-sm text-slate-500"></p>
+        </div>
+      </div>
+
+      <dl class="divide-y divide-slate-100 text-sm">
+        <div class="flex items-center justify-between px-6 py-4">
+          <dt class="flex items-center gap-2 text-slate-500">
+            <Trophy size={16} />
+            Posición
+          </dt>
+          <dd id="position" class="font-medium text-slate-900"></dd>
+        </div>
+        <div class="flex items-center justify-between px-6 py-4">
+          <dt class="flex items-center gap-2 text-slate-500">
+            <Footprints size={16} />
+            Pie hábil
+          </dt>
+          <dd id="foot" class="font-medium text-slate-900"></dd>
+        </div>
+        <div class="flex items-center justify-between px-6 py-4">
+          <dt class="flex items-center gap-2 text-slate-500">
+            <Flag size={16} />
+            Nacionalidad
+          </dt>
+          <dd id="nationality" class="font-medium text-slate-900"></dd>
+        </div>
+        <div class="flex items-center justify-between px-6 py-4">
+          <dt class="flex items-center gap-2 text-slate-500">
+            <CalendarDays size={16} />
+            Fecha de nacimiento
+          </dt>
+          <dd id="birth-date" class="font-medium text-slate-900"></dd>
+        </div>
+        <div class="flex items-center justify-between px-6 py-4">
+          <dt class="flex items-center gap-2 text-slate-500">
+            <IdCard size={16} />
+            Documento
+          </dt>
+          <dd id="document" class="font-medium text-slate-900"></dd>
+        </div>
+      </dl>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import { api, ApiError, cloudinaryUrl, type Player } from "../../lib/api";
+
+  const POSITION_LABEL: Record<Player["position"], string> = {
+    GK: "Portero",
+    DEF: "Defensa",
+    MID: "Centrocampista",
+    FWD: "Delantero",
+  };
+
+  const FOOT_LABEL: Record<NonNullable<Player["preferredFoot"]>, string> = {
+    LEFT: "Izquierdo",
+    RIGHT: "Derecho",
+    BOTH: "Ambidiestro",
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+
+  function setText(id: string, value: string) {
+    document.getElementById(id)!.textContent = value;
+  }
+
+  function formatDate(value: string): string {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const date = m
+      ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+      : new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString("es-PE", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  if (!id) {
+    loading.textContent = "Falta el id del jugador";
+  } else {
+    try {
+      const p = await api.getPlayer(id);
+
+      setText("full-name", `${p.firstName} ${p.lastName}`);
+      setText("position-label", POSITION_LABEL[p.position]);
+      setText("position", POSITION_LABEL[p.position]);
+      setText("foot", p.preferredFoot ? FOOT_LABEL[p.preferredFoot] : "—");
+      setText("nationality", p.nationality ?? "—");
+      setText("birth-date", formatDate(p.birthDate));
+      setText("document", `${p.documentType} · ${p.documentNumber}`);
+
+      const photoBox = document.getElementById("photo")!;
+      const photo = cloudinaryUrl(p.photoUrl, "w_160,h_160,c_fill,g_face,q_auto,f_auto");
+      if (photo) {
+        const img = document.createElement("img");
+        img.src = photo;
+        img.alt = `${p.firstName} ${p.lastName}`;
+        img.className = "h-full w-full object-cover";
+        photoBox.replaceChildren(img);
+      } else {
+        photoBox.textContent = `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`.toUpperCase();
+      }
+
+      loading.hidden = true;
+      content.hidden = false;
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error al cargar";
+    }
+  }
+</script>
