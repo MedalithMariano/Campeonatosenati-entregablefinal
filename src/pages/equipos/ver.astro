@@ -1,5 +1,5 @@
 ---
-import Layout from "../../layouts/Layout.astro";
+import Layout from "@/layouts/Layout.astro";
 import { MapPin, CalendarDays, Palette } from "@lucide/astro";
 ---
 
@@ -62,7 +62,7 @@ import { MapPin, CalendarDays, Palette } from "@lucide/astro";
 </Layout>
 
 <script>
-  import { api, ApiError, cloudinaryUrl } from "../../lib/api";
+  import { api, ApiError, cloudinaryUrl } from "@/lib/api";
 
   const params = new URLSearchParams(window.location.search);
   const id = params.get("id");

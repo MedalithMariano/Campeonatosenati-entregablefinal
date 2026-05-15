@@ -1,5 +1,5 @@
 ---
-import Layout from "../../layouts/Layout.astro";
+import Layout from "@/layouts/Layout.astro";
 import { Shield, Users as UsersIcon } from "@lucide/astro";
 ---
 
@@ -50,7 +50,7 @@ import { Shield, Users as UsersIcon } from "@lucide/astro";
 </Layout>
 
 <script>
-  import { auth } from "../../lib/api";
+  import { auth } from "@/lib/api";
 
   const token = auth.requireAdmin();
   if (token) {

@@ -59,7 +59,7 @@ import { Home, Shield, Users as UsersIcon, Settings, LogIn } from "@lucide/astro
 </header>
 
 <script>
-  import { auth } from "../lib/api";
+  import { auth } from "@/lib/api";
 
   const user = auth.getUser();
   if (user) {

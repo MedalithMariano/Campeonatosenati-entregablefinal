@@ -1,8 +1,8 @@
 ---
-import Layout from "../../../layouts/Layout.astro";
-import Field from "../../../components/Field.astro";
-import Select from "../../../components/Select.astro";
-import Alert from "../../../components/Alert.astro";
+import Layout from "@/layouts/Layout.astro";
+import Field from "@/components/Field.astro";
+import Select from "@/components/Select.astro";
+import Alert from "@/components/Alert.astro";
 import { Plus } from "@lucide/astro";
 ---
 
@@ -141,7 +141,7 @@ import { Plus } from "@lucide/astro";
     cloudinaryUrl,
     type Player,
     type CreatePlayerPayload,
-  } from "../../../lib/api";
+  } from "@/lib/api";
 
   const POSITION_LABEL: Record<Player["position"], string> = {
     GK: "Portero",

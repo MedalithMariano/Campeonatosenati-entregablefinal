@@ -1,7 +1,7 @@
 ---
-import AuthLayout from "../layouts/AuthLayout.astro";
-import Field from "../components/Field.astro";
-import Alert from "../components/Alert.astro";
+import AuthLayout from "@/layouts/AuthLayout.astro";
+import Field from "@/components/Field.astro";
+import Alert from "@/components/Alert.astro";
 ---
 
 <AuthLayout
@@ -50,7 +50,7 @@ import Alert from "../components/Alert.astro";
 </AuthLayout>
 
 <script>
-  import { api, auth, ApiError } from "../lib/api";
+  import { api, auth, ApiError } from "@/lib/api";
 
   auth.redirectIfAuthenticated();
 

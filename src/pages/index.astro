@@ -1,5 +1,5 @@
 ---
-import Layout from "../layouts/Layout.astro";
+import Layout from "@/layouts/Layout.astro";
 import { Rocket, LogIn, UserPlus } from "@lucide/astro";
 ---
 
@@ -41,6 +41,6 @@ import { Rocket, LogIn, UserPlus } from "@lucide/astro";
 </Layout>
 
 <script>
-  import { auth } from "../lib/api";
+  import { auth } from "@/lib/api";
   auth.redirectIfAuthenticated();
 </script>

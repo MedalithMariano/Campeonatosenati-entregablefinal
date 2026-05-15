@@ -1,7 +1,7 @@
 ---
-import Layout from "../../../layouts/Layout.astro";
-import Field from "../../../components/Field.astro";
-import Alert from "../../../components/Alert.astro";
+import Layout from "@/layouts/Layout.astro";
+import Field from "@/components/Field.astro";
+import Alert from "@/components/Alert.astro";
 ---
 
 <Layout title="Admin · Editar equipo">
@@ -85,7 +85,7 @@ import Alert from "../../../components/Alert.astro";
     ApiError,
     cloudinaryUrl,
     type UpdateTeamPayload,
-  } from "../../../lib/api";
+  } from "@/lib/api";
 
   const token = auth.requireAdmin();
   const params = new URLSearchParams(window.location.search);

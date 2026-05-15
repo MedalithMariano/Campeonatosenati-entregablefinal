@@ -1,8 +1,8 @@
 ---
-import AuthLayout from "../layouts/AuthLayout.astro";
-import Field from "../components/Field.astro";
-import Select from "../components/Select.astro";
-import Alert from "../components/Alert.astro";
+import AuthLayout from "@/layouts/AuthLayout.astro";
+import Field from "@/components/Field.astro";
+import Select from "@/components/Select.astro";
+import Alert from "@/components/Alert.astro";
 
 const documentOptions = [
   { value: "DNI", label: "DNI" },
@@ -96,7 +96,7 @@ const documentOptions = [
 </AuthLayout>
 
 <script>
-  import { api, auth, ApiError, type RegisterPayload } from "../lib/api";
+  import { api, auth, ApiError, type RegisterPayload } from "@/lib/api";
 
   auth.redirectIfAuthenticated();
 

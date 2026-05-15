@@ -1,5 +1,5 @@
 ---
-import Layout from "../../layouts/Layout.astro";
+import Layout from "@/layouts/Layout.astro";
 import { Shield } from "@lucide/astro";
 ---
 
@@ -42,7 +42,7 @@ import { Shield } from "@lucide/astro";
 </Layout>
 
 <script>
-  import { api, ApiError, cloudinaryUrl, type Team } from "../../lib/api";
+  import { api, ApiError, cloudinaryUrl, type Team } from "@/lib/api";
 
   const loading = document.getElementById("loading") as HTMLElement;
   const empty = document.getElementById("empty") as HTMLElement;

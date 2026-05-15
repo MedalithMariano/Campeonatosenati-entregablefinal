@@ -1,5 +1,5 @@
 ---
-import Layout from "../../layouts/Layout.astro";
+import Layout from "@/layouts/Layout.astro";
 import { Users as UsersIcon } from "@lucide/astro";
 ---
 
@@ -40,7 +40,7 @@ import { Users as UsersIcon } from "@lucide/astro";
 </Layout>
 
 <script>
-  import { api, ApiError, cloudinaryUrl, type Player } from "../../lib/api";
+  import { api, ApiError, cloudinaryUrl, type Player } from "@/lib/api";
 
   const POSITION_LABEL: Record<Player["position"], string> = {
     GK: "Portero",
