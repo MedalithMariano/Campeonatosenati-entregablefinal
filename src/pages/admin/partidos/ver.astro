@@ -1,0 +1,777 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Field from "@/components/Field.astro";
+import Select from "@/components/Select.astro";
+import Alert from "@/components/Alert.astro";
+---
+
+<Layout title="Admin · Partido">
+  <main class="mx-auto max-w-5xl px-6 py-10">
+    <a id="back-link" href="/admin/torneos" class="text-sm text-slate-500 hover:text-slate-700">
+      ← Volver
+    </a>
+
+    <section
+      id="loading"
+      class="mt-8 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section id="content" hidden class="mt-6 space-y-6">
+      <header class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="px-6 py-5">
+          <p class="text-sm font-medium text-indigo-600">Partido</p>
+          <h1 id="match-title" class="mt-1 text-xl font-semibold text-slate-900"></h1>
+          <p id="match-subtitle" class="text-xs text-slate-500"></p>
+        </div>
+      </header>
+
+      <!-- General -->
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-6 py-4">
+          <h2 class="text-base font-semibold text-slate-900">General</h2>
+        </div>
+        <form id="general-form" class="space-y-4 px-6 py-5" novalidate>
+          <Alert id="general-error" />
+          <Alert id="general-success" variant="success" />
+
+          <div class="grid grid-cols-2 gap-3">
+            <Field id="kickoff" label="Fecha y hora" type="datetime-local" />
+            <Select
+              id="status"
+              label="Estado"
+              options={[
+                { value: "SCHEDULED", label: "Programado" },
+                { value: "LIVE", label: "En vivo" },
+                { value: "FINISHED", label: "Finalizado" },
+                { value: "POSTPONED", label: "Postergado" },
+                { value: "CANCELLED", label: "Cancelado" },
+              ]}
+              required
+            />
+          </div>
+
+          <Field id="venue" label="Sede" placeholder="Estadio" />
+
+          <div class="grid grid-cols-2 gap-3">
+            <Field id="homeFormation" label="Formación local" placeholder="4-3-3" />
+            <Field id="awayFormation" label="Formación visitante" placeholder="4-4-2" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <Field id="homeScore" label="Goles local" type="number" />
+            <Field id="awayScore" label="Goles visitante" type="number" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <Field id="homePenalties" label="Penales local" type="number" />
+            <Field id="awayPenalties" label="Penales visitante" type="number" />
+          </div>
+
+          <div class="flex justify-end">
+            <button
+              type="submit"
+              id="general-save"
+              class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+            >
+              Guardar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Eventos -->
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-6 py-4">
+          <h2 class="text-base font-semibold text-slate-900">Eventos</h2>
+          <p class="text-xs text-slate-500">
+            Goles, tarjetas y cambios. Los goles actualizan automáticamente el marcador.
+          </p>
+        </div>
+        <form id="event-form" class="space-y-3 border-b border-slate-100 px-6 py-5" novalidate>
+          <Alert id="event-error" />
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Select
+              id="event-type"
+              label="Tipo"
+              options={[
+                { value: "GOAL", label: "Gol" },
+                { value: "OWN_GOAL", label: "Autogol" },
+                { value: "PENALTY_GOAL", label: "Gol de penal" },
+                { value: "MISSED_PENALTY", label: "Penal fallado" },
+                { value: "YELLOW_CARD", label: "Amarilla" },
+                { value: "RED_CARD", label: "Roja" },
+                { value: "SECOND_YELLOW", label: "Doble amarilla" },
+                { value: "SUBSTITUTION", label: "Cambio" },
+              ]}
+              required
+            />
+            <Field id="event-minute" label="Minuto" type="number" required />
+            <Field id="event-added" label="Tiempo añadido" type="number" />
+            <Select
+              id="event-team"
+              label="Equipo"
+              options={[
+                { value: "", label: "— equipo —" },
+              ]}
+              required
+            />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <Select
+              id="event-player"
+              label="Jugador"
+              options={[{ value: "", label: "— elige —" }]}
+              required
+            />
+            <Select
+              id="event-related"
+              label="Relacionado (asistente / sale)"
+              options={[{ value: "", label: "—" }]}
+            />
+          </div>
+          <Field id="event-notes" label="Notas" />
+          <div class="flex justify-end">
+            <button
+              type="submit"
+              id="event-add"
+              class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+            >
+              Añadir evento
+            </button>
+          </div>
+        </form>
+        <ul id="events-list" class="divide-y divide-slate-100"></ul>
+      </section>
+
+      <!-- Lineups -->
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-6 py-4">
+          <h2 class="text-base font-semibold text-slate-900">Alineaciones</h2>
+          <p class="text-xs text-slate-500">
+            Selecciona los jugadores del roster del torneo y márcalos como titulares o suplentes.
+          </p>
+        </div>
+        <div id="lineups-block" class="grid grid-cols-1 gap-6 px-6 py-5 md:grid-cols-2"></div>
+      </section>
+
+      <!-- Stats -->
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-6 py-4">
+          <h2 class="text-base font-semibold text-slate-900">Estadísticas</h2>
+        </div>
+        <div id="stats-block" class="grid grid-cols-1 gap-6 px-6 py-5 md:grid-cols-2"></div>
+      </section>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    auth,
+    ApiError,
+    type CreateMatchEventPayload,
+    type Match,
+    type MatchEvent,
+    type MatchLineupEntry,
+    type MatchTeamStats,
+    type Player,
+    type RosterEntry,
+    type SetLineupPayload,
+    type UpdateMatchPayload,
+  } from "@/lib/api";
+
+  const POSITION_LABEL: Record<MatchLineupEntry["position"], string> = {
+    GK: "Portero",
+    DEF: "Defensa",
+    MID: "Centrocampista",
+    FWD: "Delantero",
+  };
+
+  const EVENT_LABEL: Record<MatchEvent["type"], string> = {
+    GOAL: "⚽ Gol",
+    OWN_GOAL: "🥅 Autogol",
+    PENALTY_GOAL: "🎯 Penal",
+    MISSED_PENALTY: "❌ Penal fallado",
+    YELLOW_CARD: "🟨 Amarilla",
+    RED_CARD: "🟥 Roja",
+    SECOND_YELLOW: "🟨🟥 Doble amarilla",
+    SUBSTITUTION: "🔄 Cambio",
+  };
+
+  const token = auth.requireAdmin();
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+
+  if (!token || !id) {
+    if (!id) loading.textContent = "Falta el id del partido";
+  } else {
+    const generalForm = document.getElementById("general-form") as HTMLFormElement;
+    const generalSave = document.getElementById("general-save") as HTMLButtonElement;
+    const generalError = document.getElementById("general-error") as HTMLElement;
+    const generalSuccess = document.getElementById("general-success") as HTMLElement;
+
+    const eventForm = document.getElementById("event-form") as HTMLFormElement;
+    const eventAdd = document.getElementById("event-add") as HTMLButtonElement;
+    const eventError = document.getElementById("event-error") as HTMLElement;
+    const eventsList = document.getElementById("events-list") as HTMLUListElement;
+    const lineupsBlock = document.getElementById("lineups-block") as HTMLElement;
+    const statsBlock = document.getElementById("stats-block") as HTMLElement;
+
+    let match: Match;
+    let homeRoster: RosterEntry[] = [];
+    let awayRoster: RosterEntry[] = [];
+    let players: Map<string, Player> = new Map();
+
+    function setMessages(el: HTMLElement, msgs: string[]) {
+      el.replaceChildren(
+        ...msgs.map((m) => {
+          const d = document.createElement("div");
+          d.textContent = m;
+          return d;
+        }),
+      );
+      el.hidden = false;
+    }
+    function clearMessages(el: HTMLElement) {
+      el.hidden = true;
+      el.replaceChildren();
+    }
+
+    function teamName(teamId: string): string {
+      if (teamId === match.homeTeamId) return match.homeTeam?.name ?? "Local";
+      if (teamId === match.awayTeamId) return match.awayTeam?.name ?? "Visitante";
+      return "?";
+    }
+
+    function rosterFor(teamId: string): RosterEntry[] {
+      return teamId === match.homeTeamId ? homeRoster : awayRoster;
+    }
+
+    function rebuildEventSelects(selectedTeamId: string) {
+      const playerSelect = document.getElementById("event-player") as HTMLSelectElement;
+      const relatedSelect = document.getElementById("event-related") as HTMLSelectElement;
+
+      function fill(select: HTMLSelectElement, includeEmpty: boolean) {
+        const opts: HTMLOptionElement[] = [];
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = includeEmpty ? "—" : "— elige —";
+        opts.push(empty);
+        const roster = rosterFor(selectedTeamId);
+        for (const r of roster) {
+          const o = document.createElement("option");
+          o.value = r.playerId;
+          const player = r.player ?? players.get(r.playerId);
+          o.textContent = player
+            ? `${r.shirtNumber} · ${player.firstName} ${player.lastName}`
+            : r.playerId;
+          opts.push(o);
+        }
+        select.replaceChildren(...opts);
+      }
+      fill(playerSelect, false);
+      fill(relatedSelect, true);
+    }
+
+    function renderEvent(ev: MatchEvent): HTMLLIElement {
+      const li = document.createElement("li");
+      li.className = "flex items-center gap-3 px-5 py-3 text-sm";
+      const minute = document.createElement("span");
+      minute.className = "w-12 shrink-0 text-center font-mono text-xs font-semibold text-slate-700";
+      minute.textContent =
+        ev.addedMinute != null ? `${ev.minute}+${ev.addedMinute}'` : `${ev.minute}'`;
+      const text = document.createElement("div");
+      text.className = "min-w-0 flex-1";
+      const p1 = document.createElement("p");
+      p1.className = "truncate font-medium text-slate-900";
+      p1.textContent = `${EVENT_LABEL[ev.type]} · ${ev.player?.firstName ?? ""} ${ev.player?.lastName ?? ""}`.trim();
+      const p2 = document.createElement("p");
+      p2.className = "truncate text-xs text-slate-500";
+      const teamLabel = teamName(ev.teamId);
+      const rel = ev.relatedPlayer
+        ? ` · ${ev.type === "SUBSTITUTION" ? "Sale" : "Asistencia"}: ${ev.relatedPlayer.firstName} ${ev.relatedPlayer.lastName}`
+        : "";
+      p2.textContent = `${teamLabel}${rel}`;
+      text.append(p1, p2);
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className =
+        "inline-flex items-center rounded-lg border border-rose-200 bg-white px-3 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50";
+      delBtn.textContent = "Eliminar";
+      delBtn.addEventListener("click", async () => {
+        if (!confirm("¿Eliminar este evento?")) return;
+        try {
+          await api.deleteMatchEvent(token, id!, ev.id);
+          await refresh();
+        } catch (err) {
+          alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+        }
+      });
+
+      li.append(minute, text, delBtn);
+      return li;
+    }
+
+    function renderLineupColumn(
+      teamId: string,
+      teamName: string,
+      roster: RosterEntry[],
+      currentLineup: MatchLineupEntry[],
+    ) {
+      const wrap = document.createElement("div");
+      wrap.className = "space-y-3";
+
+      const h = document.createElement("h3");
+      h.className = "font-semibold text-slate-900";
+      h.textContent = teamName;
+      wrap.append(h);
+
+      const tableWrap = document.createElement("div");
+      tableWrap.className = "overflow-hidden rounded-lg border border-slate-200";
+
+      const lineupByPlayer = new Map<string, MatchLineupEntry>();
+      for (const l of currentLineup) lineupByPlayer.set(l.playerId, l);
+
+      const tbody = document.createElement("ul");
+      tbody.className = "divide-y divide-slate-100";
+
+      const fieldStates = new Map<
+        string,
+        { include: boolean; isStarter: boolean; position: MatchLineupEntry["position"] }
+      >();
+
+      for (const r of roster) {
+        const existing = lineupByPlayer.get(r.playerId);
+        fieldStates.set(r.playerId, {
+          include: existing != null,
+          isStarter: existing?.isStarter ?? true,
+          position:
+            existing?.position ?? (r.player?.position as MatchLineupEntry["position"]) ?? "MID",
+        });
+
+        const li = document.createElement("li");
+        li.className =
+          "grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-2 px-3 py-2 text-sm";
+
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = existing != null;
+        cb.addEventListener("change", () => {
+          fieldStates.get(r.playerId)!.include = cb.checked;
+        });
+
+        const name = document.createElement("span");
+        name.className = "truncate";
+        name.textContent = r.player
+          ? `${r.shirtNumber} · ${r.player.firstName} ${r.player.lastName}`
+          : r.playerId;
+
+        const positionSelect = document.createElement("select");
+        positionSelect.className =
+          "rounded border border-slate-300 bg-white px-1.5 py-1 text-xs";
+        for (const p of ["GK", "DEF", "MID", "FWD"] as const) {
+          const o = document.createElement("option");
+          o.value = p;
+          o.textContent = POSITION_LABEL[p];
+          if (p === fieldStates.get(r.playerId)!.position) o.selected = true;
+          positionSelect.append(o);
+        }
+        positionSelect.addEventListener("change", () => {
+          fieldStates.get(r.playerId)!.position =
+            positionSelect.value as MatchLineupEntry["position"];
+        });
+
+        const starterLabel = document.createElement("label");
+        starterLabel.className = "flex items-center gap-1 text-xs text-slate-600";
+        const starterCb = document.createElement("input");
+        starterCb.type = "checkbox";
+        starterCb.checked = fieldStates.get(r.playerId)!.isStarter;
+        starterCb.addEventListener("change", () => {
+          fieldStates.get(r.playerId)!.isStarter = starterCb.checked;
+        });
+        starterLabel.append(starterCb, document.createTextNode("Titular"));
+
+        const shirtSpan = document.createElement("span");
+        shirtSpan.className = "font-mono text-xs text-slate-500";
+        shirtSpan.textContent = `#${r.shirtNumber}`;
+
+        li.append(cb, name, positionSelect, starterLabel, shirtSpan);
+        tbody.append(li);
+      }
+
+      tableWrap.append(tbody);
+      wrap.append(tableWrap);
+
+      const saveBtn = document.createElement("button");
+      saveBtn.type = "button";
+      saveBtn.className =
+        "inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400";
+      saveBtn.textContent = "Guardar alineación";
+      saveBtn.addEventListener("click", async () => {
+        const entries: SetLineupPayload["entries"] = [];
+        for (const r of roster) {
+          const state = fieldStates.get(r.playerId)!;
+          if (!state.include) continue;
+          entries.push({
+            playerId: r.playerId,
+            shirtNumber: r.shirtNumber,
+            position: state.position,
+            isStarter: state.isStarter,
+          });
+        }
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Guardando…";
+        try {
+          await api.setMatchLineup(token, id!, teamId, { entries });
+          await refresh();
+        } catch (err) {
+          alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Guardar alineación";
+        }
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "flex justify-end";
+      actions.append(saveBtn);
+      wrap.append(actions);
+
+      return wrap;
+    }
+
+    function renderStatsColumn(teamId: string, teamName: string, current?: MatchTeamStats) {
+      const wrap = document.createElement("div");
+      wrap.className = "space-y-3";
+
+      const h = document.createElement("h3");
+      h.className = "font-semibold text-slate-900";
+      h.textContent = teamName;
+      wrap.append(h);
+
+      const fields: Array<{ key: keyof MatchTeamStats; label: string }> = [
+        { key: "possession", label: "Posesión (%)" },
+        { key: "shots", label: "Remates" },
+        { key: "shotsOnTarget", label: "Al arco" },
+        { key: "corners", label: "Córners" },
+        { key: "fouls", label: "Faltas" },
+        { key: "offsides", label: "Offsides" },
+        { key: "saves", label: "Atajadas" },
+      ];
+
+      const inputs: Record<string, HTMLInputElement> = {};
+      const grid = document.createElement("div");
+      grid.className = "grid grid-cols-2 gap-2";
+      for (const f of fields) {
+        const label = document.createElement("label");
+        label.className = "block";
+        const span = document.createElement("span");
+        span.className = "block text-xs font-medium text-slate-700";
+        span.textContent = f.label;
+        const inp = document.createElement("input");
+        inp.type = "number";
+        inp.min = "0";
+        inp.className =
+          "mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm";
+        inp.value = current ? String((current as any)[f.key] ?? 0) : "0";
+        inputs[f.key as string] = inp;
+        label.append(span, inp);
+        grid.append(label);
+      }
+      wrap.append(grid);
+
+      const saveBtn = document.createElement("button");
+      saveBtn.type = "button";
+      saveBtn.className =
+        "inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400";
+      saveBtn.textContent = "Guardar stats";
+      saveBtn.addEventListener("click", async () => {
+        const payload = {
+          possession: Number(inputs.possession.value) || 0,
+          shots: Number(inputs.shots.value) || 0,
+          shotsOnTarget: Number(inputs.shotsOnTarget.value) || 0,
+          corners: Number(inputs.corners.value) || 0,
+          fouls: Number(inputs.fouls.value) || 0,
+          offsides: Number(inputs.offsides.value) || 0,
+          saves: Number(inputs.saves.value) || 0,
+        };
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Guardando…";
+        try {
+          await api.upsertMatchStats(token, id!, teamId, payload);
+          await refresh();
+        } catch (err) {
+          alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Guardar stats";
+        }
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "flex justify-end";
+      actions.append(saveBtn);
+      wrap.append(actions);
+
+      return wrap;
+    }
+
+    async function refresh() {
+      const [updated, events, lineup, stats] = await Promise.all([
+        api.getMatch(id!),
+        api.listMatchEvents(id!),
+        api.listMatchLineup(id!),
+        api.listMatchStats(id!),
+      ]);
+      match = updated;
+
+      // General form
+      const f = generalForm.elements;
+      const kickoffInput = f.namedItem("kickoff") as HTMLInputElement;
+      if (match.kickoff) {
+        const d = new Date(match.kickoff);
+        const iso = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 16);
+        kickoffInput.value = iso;
+      } else {
+        kickoffInput.value = "";
+      }
+      (f.namedItem("venue") as HTMLInputElement).value = match.venue ?? "";
+      (f.namedItem("status") as HTMLSelectElement).value = match.status;
+      (f.namedItem("homeFormation") as HTMLInputElement).value = match.homeFormation ?? "";
+      (f.namedItem("awayFormation") as HTMLInputElement).value = match.awayFormation ?? "";
+      (f.namedItem("homeScore") as HTMLInputElement).value =
+        match.homeScore != null ? String(match.homeScore) : "";
+      (f.namedItem("awayScore") as HTMLInputElement).value =
+        match.awayScore != null ? String(match.awayScore) : "";
+      (f.namedItem("homePenalties") as HTMLInputElement).value =
+        match.homePenalties != null ? String(match.homePenalties) : "";
+      (f.namedItem("awayPenalties") as HTMLInputElement).value =
+        match.awayPenalties != null ? String(match.awayPenalties) : "";
+
+      // Eventos: actualizar select de equipo y eventos
+      const eventTeamSelect = document.getElementById("event-team") as HTMLSelectElement;
+      eventTeamSelect.replaceChildren(
+        (() => {
+          const o = document.createElement("option");
+          o.value = "";
+          o.textContent = "— equipo —";
+          return o;
+        })(),
+        ...(match.homeTeamId
+          ? [
+              (() => {
+                const o = document.createElement("option");
+                o.value = match.homeTeamId;
+                o.textContent = teamName(match.homeTeamId);
+                return o;
+              })(),
+            ]
+          : []),
+        ...(match.awayTeamId
+          ? [
+              (() => {
+                const o = document.createElement("option");
+                o.value = match.awayTeamId;
+                o.textContent = teamName(match.awayTeamId);
+                return o;
+              })(),
+            ]
+          : []),
+      );
+
+      // Lista de eventos
+      if (events.length === 0) {
+        const li = document.createElement("li");
+        li.className = "px-5 py-6 text-center text-sm text-slate-500";
+        li.textContent = "Aún no hay eventos.";
+        eventsList.replaceChildren(li);
+      } else {
+        eventsList.replaceChildren(...events.map(renderEvent));
+      }
+
+      // Lineups
+      const homeLineup = lineup.filter((l) => l.teamId === match.homeTeamId);
+      const awayLineup = lineup.filter((l) => l.teamId === match.awayTeamId);
+      lineupsBlock.replaceChildren(
+        renderLineupColumn(
+          match.homeTeamId!,
+          match.homeTeam?.name ?? "Local",
+          homeRoster,
+          homeLineup,
+        ),
+        renderLineupColumn(
+          match.awayTeamId!,
+          match.awayTeam?.name ?? "Visitante",
+          awayRoster,
+          awayLineup,
+        ),
+      );
+
+      // Stats
+      const homeStats = stats.find((s) => s.teamId === match.homeTeamId);
+      const awayStats = stats.find((s) => s.teamId === match.awayTeamId);
+      statsBlock.replaceChildren(
+        renderStatsColumn(
+          match.homeTeamId!,
+          match.homeTeam?.name ?? "Local",
+          homeStats,
+        ),
+        renderStatsColumn(
+          match.awayTeamId!,
+          match.awayTeam?.name ?? "Visitante",
+          awayStats,
+        ),
+      );
+    }
+
+    try {
+      match = await api.getMatch(id);
+
+      if (!match.homeTeamId || !match.awayTeamId) {
+        loading.textContent =
+          "El partido no tiene ambos equipos asignados todavía. Asígnalos primero.";
+      } else {
+        [homeRoster, awayRoster] = await Promise.all([
+          api.listRoster(match.tournamentId, match.homeTeamId),
+          api.listRoster(match.tournamentId, match.awayTeamId),
+        ]);
+
+        // Mapa de jugadores
+        for (const r of [...homeRoster, ...awayRoster]) {
+          if (r.player) players.set(r.playerId, r.player);
+        }
+
+        const backLink = document.getElementById("back-link") as HTMLAnchorElement;
+        backLink.href = `/admin/torneos/fixture?id=${encodeURIComponent(match.tournamentId)}`;
+
+        document.getElementById("match-title")!.textContent =
+          `${match.homeTeam?.name ?? "Local"} vs ${match.awayTeam?.name ?? "Visitante"}`;
+        document.getElementById("match-subtitle")!.textContent =
+          match.phase ? `${match.phase.name}` : "";
+
+        await refresh();
+
+        // Listener equipo seleccionado para llenar jugadores
+        const eventTeamSelect = document.getElementById("event-team") as HTMLSelectElement;
+        eventTeamSelect.addEventListener("change", () => {
+          if (eventTeamSelect.value) rebuildEventSelects(eventTeamSelect.value);
+        });
+
+        // Submit general
+        generalForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          clearMessages(generalError);
+          clearMessages(generalSuccess);
+          const fd = new FormData(generalForm);
+          const intOrNull = (key: string) => {
+            const v = String(fd.get(key) ?? "").trim();
+            if (v === "") return null;
+            const n = Number(v);
+            return Number.isFinite(n) ? n : null;
+          };
+
+          const kickoffRaw = String(fd.get("kickoff") ?? "").trim();
+          const payload: UpdateMatchPayload = {
+            kickoff: kickoffRaw ? new Date(kickoffRaw).toISOString() : null,
+            venue: String(fd.get("venue") ?? "").trim() || null,
+            homeFormation:
+              String(fd.get("homeFormation") ?? "").trim() || null,
+            awayFormation:
+              String(fd.get("awayFormation") ?? "").trim() || null,
+            status: fd.get("status") as Match["status"],
+            homeScore: intOrNull("homeScore"),
+            awayScore: intOrNull("awayScore"),
+            homePenalties: intOrNull("homePenalties"),
+            awayPenalties: intOrNull("awayPenalties"),
+          };
+          generalSave.disabled = true;
+          generalSave.textContent = "Guardando…";
+          try {
+            await api.updateMatch(token, id, payload);
+            await refresh();
+            setMessages(generalSuccess, ["Partido actualizado"]);
+          } catch (err) {
+            setMessages(
+              generalError,
+              err instanceof ApiError ? err.messages : ["Error inesperado"],
+            );
+          } finally {
+            generalSave.disabled = false;
+            generalSave.textContent = "Guardar";
+          }
+        });
+
+        // Submit evento
+        eventForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          clearMessages(eventError);
+          const type = (document.getElementById("event-type") as HTMLSelectElement)
+            .value as MatchEvent["type"];
+          const minute = Number(
+            (document.getElementById("event-minute") as HTMLInputElement).value,
+          );
+          const addedRaw = (
+            document.getElementById("event-added") as HTMLInputElement
+          ).value;
+          const teamId = (document.getElementById("event-team") as HTMLSelectElement).value;
+          const playerId = (document.getElementById("event-player") as HTMLSelectElement)
+            .value;
+          const relatedPlayerId = (
+            document.getElementById("event-related") as HTMLSelectElement
+          ).value;
+          const notes = (document.getElementById("event-notes") as HTMLInputElement).value.trim();
+
+          if (!teamId || !playerId) {
+            setMessages(eventError, ["Selecciona equipo y jugador"]);
+            return;
+          }
+          if (!Number.isInteger(minute) || minute < 0) {
+            setMessages(eventError, ["Minuto inválido"]);
+            return;
+          }
+
+          const payload: CreateMatchEventPayload = {
+            type,
+            minute,
+            teamId,
+            playerId,
+            ...(addedRaw.trim() !== "" && { addedMinute: Number(addedRaw) }),
+            ...(relatedPlayerId && { relatedPlayerId }),
+            ...(notes && { notes }),
+          };
+
+          eventAdd.disabled = true;
+          eventAdd.textContent = "Añadiendo…";
+          try {
+            await api.createMatchEvent(token, id, payload);
+            eventForm.reset();
+            await refresh();
+          } catch (err) {
+            setMessages(
+              eventError,
+              err instanceof ApiError ? err.messages : ["Error inesperado"],
+            );
+          } finally {
+            eventAdd.disabled = false;
+            eventAdd.textContent = "Añadir evento";
+          }
+        });
+
+        loading.hidden = true;
+        content.hidden = false;
+      }
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error";
+    }
+  }
+</script>

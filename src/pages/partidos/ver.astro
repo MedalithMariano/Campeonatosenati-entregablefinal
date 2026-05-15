@@ -1,0 +1,460 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Partido">
+  <main class="mx-auto max-w-4xl px-6 py-10">
+    <a id="back-link" href="/torneos" class="text-sm text-slate-500 hover:text-slate-700">
+      ← Volver
+    </a>
+
+    <section
+      id="loading"
+      class="mt-6 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section id="content" hidden class="mt-6 space-y-6">
+      <header
+        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      >
+        <div class="border-b border-slate-100 px-6 py-3">
+          <p id="phase-meta" class="text-xs uppercase tracking-wide text-slate-500"></p>
+          <p id="kickoff-meta" class="text-xs text-slate-500"></p>
+        </div>
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-6">
+          <div class="flex flex-col items-end gap-3 text-right">
+            <div
+              id="home-logo"
+              class="flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-base font-semibold text-slate-500"
+            ></div>
+            <p id="home-name" class="text-base font-semibold text-slate-900"></p>
+          </div>
+          <div class="text-center">
+            <p
+              id="score"
+              class="font-mono text-5xl font-bold tracking-tight text-slate-900"
+            ></p>
+            <p id="status-text" class="mt-2 text-xs text-slate-500"></p>
+            <p id="penalties" class="mt-1 text-xs text-slate-500" hidden></p>
+          </div>
+          <div class="flex flex-col items-start gap-3">
+            <div
+              id="away-logo"
+              class="flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-base font-semibold text-slate-500"
+            ></div>
+            <p id="away-name" class="text-base font-semibold text-slate-900"></p>
+          </div>
+        </div>
+      </header>
+
+      <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <nav id="tabs" class="flex gap-1 border-b border-slate-100 p-2"></nav>
+        <div id="tab-content" class="p-6"></div>
+      </div>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    ApiError,
+    cloudinaryUrl,
+    type Match,
+    type MatchEvent,
+    type MatchLineupEntry,
+    type MatchTeamStats,
+  } from "@/lib/api";
+
+  const STATUS_LABEL: Record<Match["status"], string> = {
+    SCHEDULED: "Programado",
+    LIVE: "En vivo",
+    FINISHED: "Finalizado",
+    POSTPONED: "Postergado",
+    CANCELLED: "Cancelado",
+  };
+
+  const POSITION_LABEL: Record<MatchLineupEntry["position"], string> = {
+    GK: "Portero",
+    DEF: "Defensa",
+    MID: "Centrocampista",
+    FWD: "Delantero",
+  };
+
+  const PHASE_LABEL: Record<NonNullable<Match["phase"]>["type"], string> = {
+    LEAGUE: "Liga",
+    GROUP_STAGE: "Fase de grupos",
+    ROUND_OF_16: "Octavos",
+    QUARTERFINAL: "Cuartos",
+    SEMIFINAL: "Semifinales",
+    FINAL: "Final",
+    THIRD_PLACE: "Tercer puesto",
+  };
+
+  const EVENT_LABEL: Record<MatchEvent["type"], string> = {
+    GOAL: "Gol",
+    OWN_GOAL: "Autogol",
+    PENALTY_GOAL: "Gol de penal",
+    MISSED_PENALTY: "Penal fallado",
+    YELLOW_CARD: "Tarjeta amarilla",
+    RED_CARD: "Tarjeta roja",
+    SECOND_YELLOW: "Doble amarilla",
+    SUBSTITUTION: "Cambio",
+  };
+
+  const EVENT_ICON: Record<MatchEvent["type"], string> = {
+    GOAL: "⚽",
+    OWN_GOAL: "🥅",
+    PENALTY_GOAL: "🎯",
+    MISSED_PENALTY: "❌",
+    YELLOW_CARD: "🟨",
+    RED_CARD: "🟥",
+    SECOND_YELLOW: "🟨🟥",
+    SUBSTITUTION: "🔄",
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+  const tabsNav = document.getElementById("tabs") as HTMLElement;
+  const tabContent = document.getElementById("tab-content") as HTMLElement;
+
+  type TabId = "timeline" | "lineups" | "stats";
+
+  function setText(elId: string, value: string) {
+    document.getElementById(elId)!.textContent = value;
+  }
+
+  function fmtMinute(e: MatchEvent): string {
+    return e.addedMinute != null ? `${e.minute}+${e.addedMinute}'` : `${e.minute}'`;
+  }
+
+  function fmtKickoff(value: string | null): string {
+    if (!value) return "Sin fecha";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString("es-PE", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function paintLogo(box: HTMLElement, url: string | null, name: string) {
+    const logo = cloudinaryUrl(url, "w_160,h_160,c_fill,q_auto,f_auto");
+    if (logo) {
+      const img = document.createElement("img");
+      img.src = logo;
+      img.alt = name;
+      img.className = "h-full w-full object-cover";
+      box.replaceChildren(img);
+    } else {
+      box.textContent = name[0]?.toUpperCase() ?? "?";
+    }
+  }
+
+  if (!id) {
+    loading.textContent = "Falta el id del partido";
+  } else {
+    try {
+      const [match, events, lineups, stats] = await Promise.all([
+        api.getMatch(id),
+        api.listMatchEvents(id).catch(() => [] as MatchEvent[]),
+        api.listMatchLineup(id).catch(() => [] as MatchLineupEntry[]),
+        api.listMatchStats(id).catch(() => [] as MatchTeamStats[]),
+      ]);
+
+      const phaseLabel = match.phase
+        ? `${PHASE_LABEL[match.phase.type]} · ${match.phase.name}`
+        : "Partido";
+      setText("phase-meta", phaseLabel);
+      const meta = [fmtKickoff(match.kickoff), match.venue]
+        .filter(Boolean)
+        .join(" · ");
+      setText("kickoff-meta", meta || "");
+      setText("home-name", match.homeTeam?.name ?? "Por definir");
+      setText("away-name", match.awayTeam?.name ?? "Por definir");
+
+      paintLogo(
+        document.getElementById("home-logo")!,
+        match.homeTeam?.logoUrl ?? null,
+        match.homeTeam?.name ?? "?",
+      );
+      paintLogo(
+        document.getElementById("away-logo")!,
+        match.awayTeam?.logoUrl ?? null,
+        match.awayTeam?.name ?? "?",
+      );
+
+      const score =
+        match.homeScore != null && match.awayScore != null
+          ? `${match.homeScore} - ${match.awayScore}`
+          : "—";
+      setText("score", score);
+      setText("status-text", STATUS_LABEL[match.status]);
+      if (match.homePenalties != null && match.awayPenalties != null) {
+        const pen = document.getElementById("penalties") as HTMLElement;
+        pen.textContent = `Pen. ${match.homePenalties} - ${match.awayPenalties}`;
+        pen.hidden = false;
+      }
+
+      function buildTabs(active: TabId) {
+        const tabs: Array<{ id: TabId; label: string }> = [
+          { id: "timeline", label: "Eventos" },
+          { id: "lineups", label: "Alineaciones" },
+          { id: "stats", label: "Estadísticas" },
+        ];
+        tabsNav.replaceChildren(
+          ...tabs.map(({ id: tid, label }) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className =
+              tid === active
+                ? "rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white"
+                : "rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100";
+            btn.textContent = label;
+            btn.addEventListener("click", () => render(tid));
+            return btn;
+          }),
+        );
+      }
+
+      function renderTimeline() {
+        if (events.length === 0) {
+          const p = document.createElement("p");
+          p.className = "text-center text-sm text-slate-500";
+          p.textContent = "Aún no hay eventos registrados.";
+          tabContent.append(p);
+          return;
+        }
+        const ul = document.createElement("ul");
+        ul.className = "space-y-3";
+        for (const ev of events) {
+          const li = document.createElement("li");
+          const isHome = ev.teamId === match.homeTeamId;
+          li.className = `flex items-start gap-3 ${isHome ? "" : "flex-row-reverse text-right"}`;
+
+          const minute = document.createElement("div");
+          minute.className = "w-12 shrink-0 text-center font-mono text-sm font-medium text-slate-700";
+          minute.textContent = fmtMinute(ev);
+
+          const card = document.createElement("div");
+          card.className =
+            "flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm";
+          const top = document.createElement("p");
+          top.className = "flex items-center gap-2 font-medium text-slate-900";
+          const icon = document.createElement("span");
+          icon.textContent = EVENT_ICON[ev.type];
+          top.append(icon);
+          const text = document.createElement("span");
+          text.textContent = `${EVENT_LABEL[ev.type]} · ${ev.player?.firstName ?? ""} ${ev.player?.lastName ?? ""}`.trim();
+          top.append(text);
+
+          card.append(top);
+          if (ev.relatedPlayer) {
+            const sub = document.createElement("p");
+            sub.className = "mt-1 text-xs text-slate-500";
+            sub.textContent =
+              ev.type === "SUBSTITUTION"
+                ? `Sale: ${ev.relatedPlayer.firstName} ${ev.relatedPlayer.lastName}`
+                : `Asistencia: ${ev.relatedPlayer.firstName} ${ev.relatedPlayer.lastName}`;
+            card.append(sub);
+          }
+          if (ev.notes) {
+            const notes = document.createElement("p");
+            notes.className = "mt-1 text-xs text-slate-500";
+            notes.textContent = ev.notes;
+            card.append(notes);
+          }
+
+          li.append(minute, card);
+          ul.append(li);
+        }
+        tabContent.append(ul);
+      }
+
+      function renderLineupColumn(
+        teamId: string | null,
+        teamName: string,
+        formation: string | null,
+      ) {
+        const col = document.createElement("section");
+        col.className = "space-y-3";
+
+        const header = document.createElement("div");
+        const h = document.createElement("h3");
+        h.className = "font-semibold text-slate-900";
+        h.textContent = teamName;
+        header.append(h);
+        if (formation) {
+          const f = document.createElement("p");
+          f.className = "text-xs text-slate-500";
+          f.textContent = `Formación: ${formation}`;
+          header.append(f);
+        }
+        col.append(header);
+
+        const teamLineup = lineups.filter((l) => l.teamId === teamId);
+        if (teamLineup.length === 0) {
+          const p = document.createElement("p");
+          p.className = "text-sm text-slate-500";
+          p.textContent = "Sin alineación cargada.";
+          col.append(p);
+          return col;
+        }
+
+        const starters = teamLineup.filter((l) => l.isStarter);
+        const bench = teamLineup.filter((l) => !l.isStarter);
+
+        function makeList(list: typeof teamLineup, label: string) {
+          if (list.length === 0) return null;
+          const wrap = document.createElement("div");
+          const subH = document.createElement("p");
+          subH.className =
+            "mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500";
+          subH.textContent = label;
+          wrap.append(subH);
+          const ul = document.createElement("ul");
+          ul.className = "divide-y divide-slate-100 rounded-xl border border-slate-200";
+          for (const l of list) {
+            const li = document.createElement("li");
+            li.className = "flex items-center gap-3 px-3 py-2 text-sm";
+            const shirt = document.createElement("span");
+            shirt.className =
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded bg-indigo-50 font-mono text-xs font-bold text-indigo-700";
+            shirt.textContent = String(l.shirtNumber);
+            const name = document.createElement("span");
+            name.className = "flex-1 truncate";
+            name.textContent = l.player
+              ? `${l.player.firstName} ${l.player.lastName}`
+              : l.playerId;
+            const pos = document.createElement("span");
+            pos.className = "text-xs text-slate-500";
+            pos.textContent = POSITION_LABEL[l.position];
+            li.append(shirt, name, pos);
+            ul.append(li);
+          }
+          wrap.append(ul);
+          return wrap;
+        }
+
+        const startersBlock = makeList(starters, "Titulares");
+        if (startersBlock) col.append(startersBlock);
+        const benchBlock = makeList(bench, "Suplentes");
+        if (benchBlock) col.append(benchBlock);
+
+        return col;
+      }
+
+      function renderLineups() {
+        const grid = document.createElement("div");
+        grid.className = "grid grid-cols-1 gap-6 md:grid-cols-2";
+        grid.append(
+          renderLineupColumn(
+            match.homeTeamId,
+            match.homeTeam?.name ?? "Local",
+            match.homeFormation,
+          ),
+          renderLineupColumn(
+            match.awayTeamId,
+            match.awayTeam?.name ?? "Visitante",
+            match.awayFormation,
+          ),
+        );
+        tabContent.append(grid);
+      }
+
+      function renderStats() {
+        if (stats.length < 2 || !match.homeTeamId || !match.awayTeamId) {
+          const p = document.createElement("p");
+          p.className = "text-center text-sm text-slate-500";
+          p.textContent = "Aún no hay estadísticas cargadas.";
+          tabContent.append(p);
+          return;
+        }
+        const home = stats.find((s) => s.teamId === match.homeTeamId);
+        const away = stats.find((s) => s.teamId === match.awayTeamId);
+        if (!home || !away) {
+          const p = document.createElement("p");
+          p.className = "text-center text-sm text-slate-500";
+          p.textContent = "Estadísticas incompletas.";
+          tabContent.append(p);
+          return;
+        }
+
+        const rows: Array<{ label: string; key: keyof MatchTeamStats; isPct?: boolean }> = [
+          { label: "Posesión", key: "possession", isPct: true },
+          { label: "Remates", key: "shots" },
+          { label: "Remates al arco", key: "shotsOnTarget" },
+          { label: "Córners", key: "corners" },
+          { label: "Faltas", key: "fouls" },
+          { label: "Fuera de juego", key: "offsides" },
+          { label: "Atajadas", key: "saves" },
+        ];
+
+        const wrap = document.createElement("div");
+        wrap.className = "space-y-4";
+        for (const row of rows) {
+          const h = home[row.key] as number;
+          const a = away[row.key] as number;
+          const total = Math.max(h + a, 1);
+          const homePct = row.isPct ? h : Math.round((h / total) * 100);
+          const awayPct = row.isPct ? a : Math.round((a / total) * 100);
+
+          const block = document.createElement("div");
+          const header = document.createElement("div");
+          header.className = "flex items-center justify-between text-sm";
+          const lh = document.createElement("span");
+          lh.className = "font-mono font-medium text-slate-900";
+          lh.textContent = String(h);
+          const label = document.createElement("span");
+          label.className = "text-slate-500";
+          label.textContent = row.label;
+          const la = document.createElement("span");
+          la.className = "font-mono font-medium text-slate-900";
+          la.textContent = String(a);
+          header.append(lh, label, la);
+
+          const bar = document.createElement("div");
+          bar.className = "mt-1 flex h-2 overflow-hidden rounded-full bg-slate-100";
+          const homeBar = document.createElement("div");
+          homeBar.className = "bg-indigo-500";
+          homeBar.style.width = `${homePct}%`;
+          const awayBar = document.createElement("div");
+          awayBar.className = "ml-auto bg-emerald-500";
+          awayBar.style.width = `${awayPct}%`;
+          bar.append(homeBar, awayBar);
+
+          block.append(header, bar);
+          wrap.append(block);
+        }
+        tabContent.append(wrap);
+      }
+
+      function render(active: TabId) {
+        buildTabs(active);
+        tabContent.innerHTML = "";
+        if (active === "timeline") renderTimeline();
+        else if (active === "lineups") renderLineups();
+        else if (active === "stats") renderStats();
+      }
+
+      const backLink = document.getElementById("back-link") as HTMLAnchorElement;
+      backLink.href = `/torneos/ver?id=${encodeURIComponent(match.tournamentId)}`;
+
+      render("timeline");
+
+      loading.hidden = true;
+      content.hidden = false;
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error al cargar";
+    }
+  }
+</script>

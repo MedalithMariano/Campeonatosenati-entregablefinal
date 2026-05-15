@@ -147,20 +147,18 @@ import Layout from "@/layouts/Layout.astro";
   }
 
   function teamLink(
-    teamId: string | null,
+    _teamId: string | null,
     name: string | null,
   ): HTMLElement {
-    if (!teamId || !name) {
-      const span = document.createElement("span");
+    const span = document.createElement("span");
+    if (!name) {
       span.className = "text-slate-400";
       span.textContent = "Por definir";
-      return span;
+    } else {
+      span.className = "truncate";
+      span.textContent = name;
     }
-    const a = document.createElement("a");
-    a.href = `/equipos/ver?id=${encodeURIComponent(teamId)}`;
-    a.className = "hover:underline";
-    a.textContent = name;
-    return a;
+    return span;
   }
 
   if (!id) {
@@ -316,8 +314,11 @@ import Layout from "@/layouts/Layout.astro";
             "overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100";
           for (const m of list) {
             const li = document.createElement("li");
-            li.className =
-              "grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3";
+            li.className = "p-0";
+            const a = document.createElement("a");
+            a.href = `/partidos/ver?id=${encodeURIComponent(m.id)}`;
+            a.className =
+              "grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3 transition hover:bg-slate-50";
             const home = document.createElement("div");
             home.className = "min-w-0 text-right font-medium";
             home.appendChild(teamLink(m.homeTeamId, m.homeTeam?.name ?? null));
@@ -345,7 +346,8 @@ import Layout from "@/layouts/Layout.astro";
             const away = document.createElement("div");
             away.className = "min-w-0 font-medium";
             away.appendChild(teamLink(m.awayTeamId, m.awayTeam?.name ?? null));
-            li.append(home, center, away);
+            a.append(home, center, away);
+            li.append(a);
             ul.append(li);
           }
           section.append(ul);
@@ -391,15 +393,26 @@ import Layout from "@/layouts/Layout.astro";
             : `Ronda ${round}`;
           col.append(h);
           for (const m of list) {
-            const card = document.createElement("div");
+            const card = document.createElement("a");
+            card.href = `/partidos/ver?id=${encodeURIComponent(m.id)}`;
             card.className =
-              "rounded-xl border border-slate-200 bg-white p-3 shadow-sm";
+              "block rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:shadow-md";
+
+            function teamSpan(name: string | null | undefined): HTMLSpanElement {
+              const span = document.createElement("span");
+              if (!name) {
+                span.className = "text-slate-400";
+                span.textContent = "Por definir";
+              } else {
+                span.className = "truncate";
+                span.textContent = name;
+              }
+              return span;
+            }
 
             const homeRow = document.createElement("div");
             homeRow.className = "flex items-center justify-between text-sm";
-            homeRow.appendChild(
-              teamLink(m.homeTeamId, m.homeTeam?.name ?? null),
-            );
+            homeRow.appendChild(teamSpan(m.homeTeam?.name ?? null));
             const homeScore = document.createElement("span");
             homeScore.className = "font-mono text-slate-700";
             homeScore.textContent = m.homeScore?.toString() ?? "";
@@ -408,9 +421,7 @@ import Layout from "@/layouts/Layout.astro";
             const awayRow = document.createElement("div");
             awayRow.className =
               "mt-1 flex items-center justify-between text-sm";
-            awayRow.appendChild(
-              teamLink(m.awayTeamId, m.awayTeam?.name ?? null),
-            );
+            awayRow.appendChild(teamSpan(m.awayTeam?.name ?? null));
             const awayScore = document.createElement("span");
             awayScore.className = "font-mono text-slate-700";
             awayScore.textContent = m.awayScore?.toString() ?? "";

@@ -389,14 +389,25 @@ import Alert from "@/components/Alert.astro";
       scoreCol.className = "font-mono text-sm text-slate-700";
       scoreCol.textContent = fmtScore(m);
 
+      const detailLink = document.createElement("a");
+      detailLink.href = `/admin/partidos/ver?id=${encodeURIComponent(m.id)}`;
+      detailLink.className =
+        "inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
+      detailLink.textContent = "Detalle";
+
       const editBtn = document.createElement("button");
       editBtn.type = "button";
       editBtn.className =
         "inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
-      editBtn.textContent = "Editar";
+      editBtn.textContent = "Resultado";
       editBtn.addEventListener("click", () => openMatchEditor(m));
 
-      li.append(teamsCol, scoreCol, editBtn);
+      const actions = document.createElement("div");
+      actions.className = "flex items-center gap-2";
+      actions.append(detailLink, editBtn);
+
+      li.className = "grid grid-cols-[1fr_auto_auto] items-center gap-3 px-5 py-3";
+      li.append(teamsCol, scoreCol, actions);
       return li;
     }
 

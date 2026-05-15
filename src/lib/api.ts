@@ -268,11 +268,96 @@ export interface CreateGroupPayload {
 export interface UpdateMatchPayload {
   kickoff?: string | null;
   venue?: string | null;
+  homeFormation?: string | null;
+  awayFormation?: string | null;
   status?: MatchStatus;
   homeScore?: number | null;
   awayScore?: number | null;
   homePenalties?: number | null;
   awayPenalties?: number | null;
+}
+
+export type MatchEventType =
+  | "GOAL"
+  | "OWN_GOAL"
+  | "PENALTY_GOAL"
+  | "MISSED_PENALTY"
+  | "YELLOW_CARD"
+  | "RED_CARD"
+  | "SECOND_YELLOW"
+  | "SUBSTITUTION";
+
+export interface MatchEvent {
+  id: string;
+  matchId: string;
+  type: MatchEventType;
+  minute: number;
+  addedMinute: number | null;
+  teamId: string;
+  playerId: string;
+  relatedPlayerId: string | null;
+  notes: string | null;
+  createdAt: string;
+  player?: Player;
+  relatedPlayer?: Player | null;
+  team?: Team;
+}
+
+export interface CreateMatchEventPayload {
+  type: MatchEventType;
+  minute: number;
+  addedMinute?: number;
+  teamId: string;
+  playerId: string;
+  relatedPlayerId?: string;
+  notes?: string;
+}
+
+export interface MatchLineupEntry {
+  id: string;
+  matchId: string;
+  teamId: string;
+  playerId: string;
+  shirtNumber: number;
+  position: PlayerPosition;
+  isStarter: boolean;
+  createdAt: string;
+  player?: Player;
+  team?: Team;
+}
+
+export interface SetLineupPayload {
+  entries: Array<{
+    playerId: string;
+    shirtNumber: number;
+    position: PlayerPosition;
+    isStarter: boolean;
+  }>;
+}
+
+export interface MatchTeamStats {
+  id: string;
+  matchId: string;
+  teamId: string;
+  possession: number;
+  shots: number;
+  shotsOnTarget: number;
+  corners: number;
+  fouls: number;
+  offsides: number;
+  saves: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertMatchStatsPayload {
+  possession?: number;
+  shots?: number;
+  shotsOnTarget?: number;
+  corners?: number;
+  fouls?: number;
+  offsides?: number;
+  saves?: number;
 }
 
 export interface GenerateFixtureResult {
@@ -684,6 +769,72 @@ export const api = {
       headers: authHeader(token),
       body: JSON.stringify(payload),
     });
+  },
+
+  // ---- Match events ----
+  listMatchEvents(matchId: string) {
+    return request<MatchEvent[]>(`/matches/${matchId}/events`);
+  },
+
+  createMatchEvent(
+    token: string,
+    matchId: string,
+    payload: CreateMatchEventPayload,
+  ) {
+    return request<MatchEvent>(`/matches/${matchId}/events`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteMatchEvent(token: string, matchId: string, eventId: string) {
+    return request<null>(`/matches/${matchId}/events/${eventId}`, {
+      method: "DELETE",
+      headers: authHeader(token),
+    });
+  },
+
+  // ---- Match lineups ----
+  listMatchLineup(matchId: string) {
+    return request<MatchLineupEntry[]>(`/matches/${matchId}/lineup`);
+  },
+
+  setMatchLineup(
+    token: string,
+    matchId: string,
+    teamId: string,
+    payload: SetLineupPayload,
+  ) {
+    return request<MatchLineupEntry[]>(
+      `/matches/${matchId}/lineup/${teamId}`,
+      {
+        method: "PUT",
+        headers: authHeader(token),
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+
+  // ---- Match stats ----
+  listMatchStats(matchId: string) {
+    return request<MatchTeamStats[]>(`/matches/${matchId}/stats`);
+  },
+
+  upsertMatchStats(
+    token: string,
+    matchId: string,
+    teamId: string,
+    payload: UpsertMatchStatsPayload,
+  ) {
+    return request<MatchTeamStats>(
+      `/matches/${matchId}/stats/${teamId}`,
+      {
+        method: "PUT",
+        headers: authHeader(token),
+        body: JSON.stringify(payload),
+      },
+    );
   },
 };
 
