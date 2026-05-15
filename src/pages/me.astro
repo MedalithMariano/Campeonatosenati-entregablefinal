@@ -1,6 +1,16 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { LogOut, Mail, IdCard, Phone, CalendarDays, Clock } from "@lucide/astro";
+import Field from "../components/Field.astro";
+import Alert from "../components/Alert.astro";
+import {
+  LogOut,
+  Mail,
+  IdCard,
+  Phone,
+  CalendarDays,
+  Clock,
+  Pencil,
+} from "@lucide/astro";
 ---
 
 <Layout title="Mi perfil">
@@ -12,14 +22,25 @@ import { LogOut, Mail, IdCard, Phone, CalendarDays, Clock } from "@lucide/astro"
           Perfil
         </h1>
       </div>
-      <button
-        id="logout-btn"
-        type="button"
-        class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100"
-      >
-        <LogOut size={16} />
-        Cerrar sesión
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          id="edit-btn"
+          type="button"
+          hidden
+          class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100"
+        >
+          <Pencil size={16} />
+          Editar
+        </button>
+        <button
+          id="logout-btn"
+          type="button"
+          class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100"
+        >
+          <LogOut size={16} />
+          Cerrar sesión
+        </button>
+      </div>
     </header>
 
     <section
@@ -62,7 +83,7 @@ import { LogOut, Mail, IdCard, Phone, CalendarDays, Clock } from "@lucide/astro"
             <Phone size={16} />
             Teléfono
           </dt>
-          <dd id="phone" class="font-medium text-slate-900"></dd>
+          <dd id="phone-value" class="font-medium text-slate-900"></dd>
         </div>
         <div class="flex items-center justify-between px-6 py-4">
           <dt class="flex items-center gap-2 text-slate-500">
@@ -80,11 +101,66 @@ import { LogOut, Mail, IdCard, Phone, CalendarDays, Clock } from "@lucide/astro"
         </div>
       </dl>
     </section>
+
+    <section
+      id="edit-section"
+      hidden
+      class="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-100 px-6 py-4">
+        <h2 class="text-base font-semibold text-slate-900">Editar perfil</h2>
+        <p class="text-sm text-slate-500">
+          El email y el documento no se pueden modificar.
+        </p>
+      </div>
+      <form id="edit-form" class="space-y-5 px-6 py-5" novalidate>
+        <Alert id="edit-error" />
+        <Alert id="edit-success" variant="success" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="firstName" label="Nombres" autocomplete="given-name" required />
+          <Field id="lastName" label="Apellidos" autocomplete="family-name" required />
+        </div>
+
+        <Field
+          id="phone"
+          label="Teléfono"
+          type="tel"
+          placeholder="+51 987654321"
+          autocomplete="tel"
+        />
+
+        <Field id="birthDate" label="Fecha de nacimiento" type="date" />
+
+        <div class="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            id="cancel-btn"
+            class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-xs transition hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            id="save-btn"
+            class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:bg-indigo-400"
+          >
+            Guardar cambios
+          </button>
+        </div>
+      </form>
+    </section>
   </main>
 </Layout>
 
 <script>
-  import { api, auth, ApiError } from "../lib/api";
+  import {
+    api,
+    auth,
+    ApiError,
+    type MeResponse,
+    type UpdateProfilePayload,
+  } from "../lib/api";
 
   const token = auth.requireAuth();
   if (!token) {
@@ -93,6 +169,13 @@ import { LogOut, Mail, IdCard, Phone, CalendarDays, Clock } from "@lucide/astro"
     const loading = document.getElementById("loading") as HTMLElement;
     const content = document.getElementById("content") as HTMLElement;
     const logoutBtn = document.getElementById("logout-btn") as HTMLButtonElement;
+    const editBtn = document.getElementById("edit-btn") as HTMLButtonElement;
+    const editSection = document.getElementById("edit-section") as HTMLElement;
+    const editForm = document.getElementById("edit-form") as HTMLFormElement;
+    const cancelBtn = document.getElementById("cancel-btn") as HTMLButtonElement;
+    const saveBtn = document.getElementById("save-btn") as HTMLButtonElement;
+    const editError = document.getElementById("edit-error") as HTMLElement;
+    const editSuccess = document.getElementById("edit-success") as HTMLElement;
 
     logoutBtn.addEventListener("click", () => {
       auth.clearToken();
@@ -123,30 +206,121 @@ import { LogOut, Mail, IdCard, Phone, CalendarDays, Clock } from "@lucide/astro"
       return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
     }
 
-    try {
-      const me = await api.me(token);
-      const p = me.profile;
+    function setText(id: string, value: string) {
+      document.getElementById(id)!.textContent = value;
+    }
 
+    function renderProfile(me: MeResponse) {
+      const p = me.profile;
       const fullName = p ? `${p.firstName} ${p.lastName}` : me.email;
-      document.getElementById("full-name")!.textContent = fullName;
+      setText("full-name", fullName);
       document.querySelector("#email-display span")!.textContent = me.email;
       document.getElementById("avatar")!.textContent = p
         ? initials(p.firstName, p.lastName)
         : (me.email[0] ?? "?").toUpperCase();
-      document.getElementById("document")!.textContent = p
-        ? `${p.documentType} · ${p.documentNumber}`
-        : "—";
-      document.getElementById("phone")!.textContent = p?.phone ?? "—";
-      document.getElementById("birth-date")!.textContent = formatDate(
-        p?.birthDate ?? null,
+      setText("document", p ? `${p.documentType} · ${p.documentNumber}` : "—");
+      setText("phone-value", p?.phone ?? "—");
+      setText("birth-date", formatDate(p?.birthDate ?? null));
+      setText("created-at", formatDate(p?.createdAt ?? null, true));
+    }
+
+    function fillEditForm(me: MeResponse) {
+      const p = me.profile;
+      (editForm.elements.namedItem("firstName") as HTMLInputElement).value =
+        p?.firstName ?? "";
+      (editForm.elements.namedItem("lastName") as HTMLInputElement).value =
+        p?.lastName ?? "";
+      (editForm.elements.namedItem("phone") as HTMLInputElement).value =
+        p?.phone ?? "";
+      (editForm.elements.namedItem("birthDate") as HTMLInputElement).value =
+        p?.birthDate ?? "";
+    }
+
+    function setMessages(el: HTMLElement, messages: string[]) {
+      el.replaceChildren(
+        ...messages.map((m) => {
+          const div = document.createElement("div");
+          div.textContent = m;
+          return div;
+        }),
       );
-      document.getElementById("created-at")!.textContent = formatDate(
-        p?.createdAt ?? null,
-        true,
-      );
+      el.hidden = false;
+    }
+
+    function clearMessages(el: HTMLElement) {
+      el.hidden = true;
+      el.replaceChildren();
+    }
+
+    function showEdit(me: MeResponse) {
+      fillEditForm(me);
+      clearMessages(editError);
+      clearMessages(editSuccess);
+      editSection.hidden = false;
+      editSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function hideEdit() {
+      editSection.hidden = true;
+    }
+
+    let currentMe: MeResponse | null = null;
+
+    editBtn.addEventListener("click", () => {
+      if (currentMe) showEdit(currentMe);
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      hideEdit();
+    });
+
+    editForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearMessages(editError);
+      clearMessages(editSuccess);
+
+      const formData = new FormData(editForm);
+      const phoneRaw = String(formData.get("phone") ?? "").trim();
+      const birthRaw = String(formData.get("birthDate") ?? "").trim();
+
+      const payload: UpdateProfilePayload = {
+        firstName: String(formData.get("firstName") ?? "").trim(),
+        lastName: String(formData.get("lastName") ?? "").trim(),
+        phone: phoneRaw === "" ? null : phoneRaw,
+        birthDate: birthRaw === "" ? null : birthRaw,
+      };
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Guardando…";
+
+      try {
+        const updated = await api.updateMe(token, payload);
+        currentMe = updated;
+        renderProfile(updated);
+        setMessages(editSuccess, ["Perfil actualizado correctamente"]);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          auth.clearToken();
+          window.location.href = "/login";
+          return;
+        }
+        setMessages(
+          editError,
+          err instanceof ApiError ? err.messages : ["Error inesperado"],
+        );
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Guardar cambios";
+      }
+    });
+
+    try {
+      currentMe = await api.me(token);
+      renderProfile(currentMe);
 
       loading.hidden = true;
       content.hidden = false;
+      editBtn.hidden = false;
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         auth.clearToken();

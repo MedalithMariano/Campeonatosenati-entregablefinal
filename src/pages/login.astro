@@ -59,13 +59,19 @@ import Alert from "../components/Alert.astro";
   const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
 
   function showError(messages: string[]) {
-    errorBox.innerHTML = messages.map((m) => `<div>${m}</div>`).join("");
+    errorBox.replaceChildren(
+      ...messages.map((m) => {
+        const div = document.createElement("div");
+        div.textContent = m;
+        return div;
+      }),
+    );
     errorBox.hidden = false;
   }
 
   function clearError() {
     errorBox.hidden = true;
-    errorBox.innerHTML = "";
+    errorBox.replaceChildren();
   }
 
   form.addEventListener("submit", async (e) => {

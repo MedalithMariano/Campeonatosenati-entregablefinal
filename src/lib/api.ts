@@ -44,6 +44,13 @@ export interface RegisterPayload {
   birthDate?: string;
 }
 
+export interface UpdateProfilePayload {
+  firstName?: string;
+  lastName?: string;
+  phone?: string | null;
+  birthDate?: string | null;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -101,6 +108,14 @@ export const api = {
   me(token: string) {
     return request<MeResponse>("/auth/me", {
       headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  updateMe(token: string, payload: UpdateProfilePayload) {
+    return request<MeResponse>("/auth/me", {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
     });
   },
 };
