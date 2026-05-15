@@ -1,0 +1,272 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Alert from "@/components/Alert.astro";
+---
+
+<Layout title="Admin · Inscripciones">
+  <main class="mx-auto max-w-5xl px-6 py-10">
+    <a
+      href="/admin/torneos"
+      class="text-sm text-slate-500 hover:text-slate-700"
+    >← Volver a torneos</a>
+
+    <section
+      id="loading"
+      class="mt-8 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section id="content" hidden class="mt-8 space-y-6">
+      <header class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="px-6 py-5">
+          <p class="text-sm font-medium text-indigo-600">Torneo</p>
+          <h1 id="tournament-name" class="mt-1 text-xl font-semibold text-slate-900"></h1>
+          <p id="tournament-meta" class="text-xs text-slate-500"></p>
+        </div>
+      </header>
+
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-6 py-4">
+          <h2 class="text-base font-semibold text-slate-900">Inscribir equipo</h2>
+        </div>
+        <form id="register-form" class="space-y-4 px-6 py-5" novalidate>
+          <Alert id="register-error" />
+
+          <div class="space-y-1.5">
+            <label for="team-select" class="block text-sm font-medium text-slate-700">
+              Equipo
+            </label>
+            <select
+              id="team-select"
+              class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+            >
+              <option value="">— elige un equipo —</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-end">
+            <button
+              type="submit"
+              id="register-btn"
+              class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+            >
+              Inscribir
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-6 py-4">
+          <h2 class="text-base font-semibold text-slate-900">Equipos inscritos</h2>
+          <p id="teams-count" class="text-xs text-slate-500"></p>
+        </div>
+        <ul id="registered-list" class="divide-y divide-slate-100"></ul>
+      </section>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    auth,
+    ApiError,
+    cloudinaryUrl,
+    type Team,
+    type TournamentTeam,
+  } from "@/lib/api";
+
+  const token = auth.requireAdmin();
+  const params = new URLSearchParams(window.location.search);
+  const tournamentId = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+
+  if (!token || !tournamentId) {
+    if (!tournamentId) loading.textContent = "Falta el id del torneo";
+  } else {
+    const teamSelect = document.getElementById("team-select") as HTMLSelectElement;
+    const registerForm = document.getElementById("register-form") as HTMLFormElement;
+    const registerBtn = document.getElementById("register-btn") as HTMLButtonElement;
+    const registerError = document.getElementById("register-error") as HTMLElement;
+    const registeredList = document.getElementById("registered-list") as HTMLUListElement;
+    const teamsCount = document.getElementById("teams-count")!;
+
+    let allTeams: Team[] = [];
+    let registered: TournamentTeam[] = [];
+
+    function setMessages(el: HTMLElement, messages: string[]) {
+      el.replaceChildren(
+        ...messages.map((m) => {
+          const d = document.createElement("div");
+          d.textContent = m;
+          return d;
+        }),
+      );
+      el.hidden = false;
+    }
+    function clearMessages(el: HTMLElement) {
+      el.hidden = true;
+      el.replaceChildren();
+    }
+
+    function updateSelect() {
+      const registeredIds = new Set(registered.map((r) => r.teamId));
+      const available = allTeams.filter((t) => !registeredIds.has(t.id));
+      teamSelect.replaceChildren(
+        ...[
+          (() => {
+            const o = document.createElement("option");
+            o.value = "";
+            o.textContent =
+              available.length === 0
+                ? "— no hay equipos disponibles —"
+                : "— elige un equipo —";
+            return o;
+          })(),
+          ...available.map((team) => {
+            const o = document.createElement("option");
+            o.value = team.id;
+            o.textContent = team.name;
+            return o;
+          }),
+        ],
+      );
+      registerBtn.disabled = available.length === 0;
+    }
+
+    function renderRow(reg: TournamentTeam): HTMLLIElement {
+      const li = document.createElement("li");
+      li.className = "flex items-center gap-4 px-5 py-4";
+
+      const team = reg.team;
+      const logoBox = document.createElement("div");
+      logoBox.className =
+        "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-xs font-semibold text-slate-500";
+      const logo = cloudinaryUrl(
+        team?.logoUrl ?? null,
+        "w_80,h_80,c_fill,q_auto,f_auto",
+      );
+      if (logo) {
+        const img = document.createElement("img");
+        img.src = logo;
+        img.alt = team?.name ?? "";
+        img.className = "h-full w-full object-cover";
+        logoBox.appendChild(img);
+      } else {
+        logoBox.textContent = team?.name?.[0]?.toUpperCase() ?? "?";
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "min-w-0 flex-1";
+      const name = document.createElement("p");
+      name.className = "truncate font-medium text-slate-900";
+      name.textContent = team?.name ?? reg.teamId;
+      const sub = document.createElement("p");
+      sub.className = "truncate text-xs text-slate-500";
+      sub.textContent = reg.status;
+      meta.append(name, sub);
+
+      const rosterLink = document.createElement("a");
+      rosterLink.href = `/admin/torneos/roster?id=${encodeURIComponent(tournamentId!)}&teamId=${encodeURIComponent(reg.teamId)}`;
+      rosterLink.className =
+        "inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
+      rosterLink.textContent = "Roster";
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className =
+        "inline-flex items-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50";
+      delBtn.textContent = "Quitar";
+      delBtn.addEventListener("click", async () => {
+        if (!confirm(`¿Retirar a "${team?.name ?? reg.teamId}" del torneo?`)) return;
+        try {
+          await api.unregisterTeam(token, tournamentId!, reg.teamId);
+          await refresh();
+        } catch (err) {
+          alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+        }
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "flex items-center gap-2";
+      actions.append(rosterLink, delBtn);
+
+      li.append(logoBox, meta, actions);
+      return li;
+    }
+
+    async function refresh() {
+      registered = await api.listRegistrations(tournamentId!);
+      teamsCount.textContent = `${registered.length} equipo${registered.length === 1 ? "" : "s"}`;
+      if (registered.length === 0) {
+        const li = document.createElement("li");
+        li.className = "px-5 py-6 text-center text-sm text-slate-500";
+        li.textContent = "Aún no hay equipos inscritos.";
+        registeredList.replaceChildren(li);
+      } else {
+        registeredList.replaceChildren(...registered.map(renderRow));
+      }
+      updateSelect();
+    }
+
+    try {
+      const [tournament, teams, regs] = await Promise.all([
+        api.getTournament(tournamentId),
+        api.listTeams(),
+        api.listRegistrations(tournamentId),
+      ]);
+      allTeams = teams;
+      registered = regs;
+
+      document.getElementById("tournament-name")!.textContent = tournament.name;
+      document.getElementById("tournament-meta")!.textContent =
+        `${tournament.season} · ${tournament.format}`;
+
+      teamsCount.textContent = `${regs.length} equipo${regs.length === 1 ? "" : "s"}`;
+      if (regs.length === 0) {
+        const li = document.createElement("li");
+        li.className = "px-5 py-6 text-center text-sm text-slate-500";
+        li.textContent = "Aún no hay equipos inscritos.";
+        registeredList.appendChild(li);
+      } else {
+        registeredList.replaceChildren(...regs.map(renderRow));
+      }
+      updateSelect();
+
+      loading.hidden = true;
+      content.hidden = false;
+
+      registerForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearMessages(registerError);
+        const teamId = teamSelect.value;
+        if (!teamId) {
+          setMessages(registerError, ["Elige un equipo"]);
+          return;
+        }
+
+        registerBtn.disabled = true;
+        registerBtn.textContent = "Inscribiendo…";
+        try {
+          await api.registerTeam(token, tournamentId, teamId);
+          await refresh();
+        } catch (err) {
+          setMessages(
+            registerError,
+            err instanceof ApiError ? err.messages : ["Error inesperado"],
+          );
+        } finally {
+          registerBtn.disabled = false;
+          registerBtn.textContent = "Inscribir";
+        }
+      });
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error";
+    }
+  }
+</script>

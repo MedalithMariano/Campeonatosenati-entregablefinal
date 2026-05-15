@@ -1,6 +1,6 @@
 ---
 import Layout from "@/layouts/Layout.astro";
-import { Shield, Users as UsersIcon } from "@lucide/astro";
+import { Shield, Users as UsersIcon, Trophy } from "@lucide/astro";
 ---
 
 <Layout title="Admin">
@@ -18,8 +18,21 @@ import { Shield, Users as UsersIcon } from "@lucide/astro";
     <section
       id="content"
       hidden
-      class="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2"
+      class="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
     >
+      <a
+        href="/admin/torneos"
+        class="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"
+      >
+        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+          <Trophy size={22} />
+        </span>
+        <div>
+          <p class="font-semibold text-slate-900">Torneos</p>
+          <p class="text-sm text-slate-500">Crear torneos, inscribir equipos y armar rosters.</p>
+        </div>
+      </a>
+
       <a
         href="/admin/equipos"
         class="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"

@@ -96,6 +96,85 @@ export interface UploadedImage {
   format: string;
 }
 
+export type TournamentFormat = "LEAGUE" | "KNOCKOUT" | "GROUPS_KNOCKOUT";
+export type TournamentStatus =
+  | "DRAFT"
+  | "REGISTRATION"
+  | "IN_PROGRESS"
+  | "FINISHED";
+export type RegistrationStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "WITHDRAWN";
+
+export interface Tournament {
+  id: string;
+  name: string;
+  season: string;
+  format: TournamentFormat;
+  status: TournamentStatus;
+  pointsWin: number;
+  pointsDraw: number;
+  pointsLoss: number;
+  minPlayersPerRoster: number;
+  maxPlayersPerRoster: number;
+  startDate: string | null;
+  endDate: string | null;
+  description: string | null;
+  bannerUrl: string | null;
+  bannerPublicId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTournamentPayload {
+  name: string;
+  season: string;
+  format: TournamentFormat;
+  status?: TournamentStatus;
+  pointsWin?: number;
+  pointsDraw?: number;
+  pointsLoss?: number;
+  minPlayersPerRoster?: number;
+  maxPlayersPerRoster?: number;
+  startDate?: string;
+  endDate?: string;
+  description?: string;
+  bannerUrl?: string;
+  bannerPublicId?: string;
+}
+
+export type UpdateTournamentPayload = Partial<CreateTournamentPayload>;
+
+export interface TournamentTeam {
+  id: string;
+  tournamentId: string;
+  teamId: string;
+  status: RegistrationStatus;
+  groupId: string | null;
+  registeredAt: string;
+  team?: Team;
+}
+
+export interface RosterEntry {
+  id: string;
+  tournamentId: string;
+  teamId: string;
+  playerId: string;
+  shirtNumber: number;
+  createdAt: string;
+  player?: Player;
+}
+
+export interface RosterValidation {
+  count: number;
+  min: number;
+  max: number;
+  belowMin: boolean;
+  aboveMax: boolean;
+}
+
 export interface CreateTeamPayload {
   name: string;
   shortName?: string;
@@ -276,6 +355,123 @@ export const api = {
       headers: authHeader(token),
       body: fd,
     });
+  },
+
+  // ---- Tournaments ----
+  listTournaments() {
+    return request<Tournament[]>("/tournaments");
+  },
+
+  getTournament(id: string) {
+    return request<Tournament>(`/tournaments/${id}`);
+  },
+
+  createTournament(token: string, payload: CreateTournamentPayload) {
+    return request<Tournament>("/tournaments", {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateTournament(
+    token: string,
+    id: string,
+    payload: UpdateTournamentPayload,
+  ) {
+    return request<Tournament>(`/tournaments/${id}`, {
+      method: "PATCH",
+      headers: authHeader(token),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteTournament(token: string, id: string) {
+    return request<null>(`/tournaments/${id}`, {
+      method: "DELETE",
+      headers: authHeader(token),
+    });
+  },
+
+  // ---- Registrations ----
+  listRegistrations(tournamentId: string) {
+    return request<TournamentTeam[]>(`/tournaments/${tournamentId}/teams`);
+  },
+
+  registerTeam(token: string, tournamentId: string, teamId: string) {
+    return request<TournamentTeam>(`/tournaments/${tournamentId}/teams`, {
+      method: "POST",
+      headers: authHeader(token),
+      body: JSON.stringify({ teamId }),
+    });
+  },
+
+  unregisterTeam(token: string, tournamentId: string, teamId: string) {
+    return request<null>(`/tournaments/${tournamentId}/teams/${teamId}`, {
+      method: "DELETE",
+      headers: authHeader(token),
+    });
+  },
+
+  // ---- Roster ----
+  listRoster(tournamentId: string, teamId: string) {
+    return request<RosterEntry[]>(
+      `/tournaments/${tournamentId}/teams/${teamId}/roster`,
+    );
+  },
+
+  validateRoster(tournamentId: string, teamId: string) {
+    return request<RosterValidation>(
+      `/tournaments/${tournamentId}/teams/${teamId}/roster/validate`,
+    );
+  },
+
+  addRosterEntry(
+    token: string,
+    tournamentId: string,
+    teamId: string,
+    payload: { playerId: string; shirtNumber: number },
+  ) {
+    return request<RosterEntry>(
+      `/tournaments/${tournamentId}/teams/${teamId}/roster`,
+      {
+        method: "POST",
+        headers: authHeader(token),
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+
+  updateRosterEntry(
+    token: string,
+    tournamentId: string,
+    teamId: string,
+    playerId: string,
+    shirtNumber: number,
+  ) {
+    return request<RosterEntry>(
+      `/tournaments/${tournamentId}/teams/${teamId}/roster/${playerId}`,
+      {
+        method: "PATCH",
+        headers: authHeader(token),
+        body: JSON.stringify({ shirtNumber }),
+      },
+    );
+  },
+
+  removeRosterEntry(
+    token: string,
+    tournamentId: string,
+    teamId: string,
+    playerId: string,
+  ) {
+    return request<null>(
+      `/tournaments/${tournamentId}/teams/${teamId}/roster/${playerId}`,
+      {
+        method: "DELETE",
+        headers: authHeader(token),
+      },
+    );
   },
 };
 

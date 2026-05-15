@@ -1,5 +1,5 @@
 ---
-import { Home, Shield, Users as UsersIcon, Settings, LogIn } from "@lucide/astro";
+import { Home, Shield, Users as UsersIcon, Trophy, Settings, LogIn } from "@lucide/astro";
 ---
 
 <header class="border-b border-slate-200 bg-white">
@@ -10,6 +10,15 @@ import { Home, Shield, Users as UsersIcon, Settings, LogIn } from "@lucide/astro
     </a>
 
     <ul class="flex items-center gap-1 text-sm">
+      <li>
+        <a
+          href="/torneos"
+          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+        >
+          <Trophy size={16} />
+          Torneos
+        </a>
+      </li>
       <li>
         <a
           href="/equipos"

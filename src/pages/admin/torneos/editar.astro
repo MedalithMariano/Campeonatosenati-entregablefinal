@@ -1,0 +1,253 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Field from "@/components/Field.astro";
+import Select from "@/components/Select.astro";
+import Alert from "@/components/Alert.astro";
+---
+
+<Layout title="Admin · Editar torneo">
+  <main class="mx-auto max-w-3xl px-6 py-10">
+    <a
+      href="/admin/torneos"
+      class="text-sm text-slate-500 hover:text-slate-700"
+    >← Volver a torneos</a>
+
+    <section
+      id="loading"
+      class="mt-8 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section
+      id="content"
+      hidden
+      class="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-100 px-6 py-4">
+        <h1 class="text-base font-semibold text-slate-900">Editar torneo</h1>
+      </div>
+      <form id="edit-form" class="space-y-5 px-6 py-5" novalidate>
+        <Alert id="edit-error" />
+        <Alert id="edit-success" variant="success" />
+
+        <div
+          id="current-banner"
+          class="h-32 w-full rounded-lg bg-slate-100 bg-cover bg-center"
+        ></div>
+
+        <Field id="name" label="Nombre" required />
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="season" label="Temporada" required />
+          <Select
+            id="format"
+            label="Formato"
+            options={[
+              { value: "LEAGUE", label: "Liga" },
+              { value: "KNOCKOUT", label: "Eliminatoria" },
+              { value: "GROUPS_KNOCKOUT", label: "Grupos + Eliminatoria" },
+            ]}
+            required
+          />
+        </div>
+
+        <Select
+          id="status"
+          label="Estado"
+          options={[
+            { value: "DRAFT", label: "Borrador" },
+            { value: "REGISTRATION", label: "Inscripciones abiertas" },
+            { value: "IN_PROGRESS", label: "En curso" },
+            { value: "FINISHED", label: "Finalizado" },
+          ]}
+          required
+        />
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="startDate" label="Inicio" type="date" />
+          <Field id="endDate" label="Fin" type="date" />
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <Field id="pointsWin" label="Pts. victoria" type="number" />
+          <Field id="pointsDraw" label="Pts. empate" type="number" />
+          <Field id="pointsLoss" label="Pts. derrota" type="number" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="minPlayersPerRoster" label="Mín. roster" type="number" />
+          <Field id="maxPlayersPerRoster" label="Máx. roster" type="number" />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="description" class="block text-sm font-medium text-slate-700">
+            Descripción <span class="text-slate-400 font-normal">· opcional</span>
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            rows="3"
+            class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+          ></textarea>
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="banner" class="block text-sm font-medium text-slate-700">
+            Reemplazar banner <span class="text-slate-400 font-normal">· opcional</span>
+          </label>
+          <input
+            id="banner"
+            name="banner"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-slate-700"
+          />
+        </div>
+
+        <div class="flex items-center justify-end">
+          <button
+            type="submit"
+            id="save-btn"
+            class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+          >
+            Guardar cambios
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    auth,
+    ApiError,
+    cloudinaryUrl,
+    type UpdateTournamentPayload,
+  } from "@/lib/api";
+
+  const token = auth.requireAdmin();
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+
+  if (token && id) {
+    const form = document.getElementById("edit-form") as HTMLFormElement;
+    const errorBox = document.getElementById("edit-error") as HTMLElement;
+    const successBox = document.getElementById("edit-success") as HTMLElement;
+    const saveBtn = document.getElementById("save-btn") as HTMLButtonElement;
+    const bannerBox = document.getElementById("current-banner") as HTMLElement;
+
+    function setMessages(el: HTMLElement, messages: string[]) {
+      el.replaceChildren(
+        ...messages.map((m) => {
+          const d = document.createElement("div");
+          d.textContent = m;
+          return d;
+        }),
+      );
+      el.hidden = false;
+    }
+    function clearMessages(el: HTMLElement) {
+      el.hidden = true;
+      el.replaceChildren();
+    }
+    function paintBanner(url: string | null) {
+      const src = cloudinaryUrl(url, "w_900,h_240,c_fill,q_auto,f_auto");
+      bannerBox.style.backgroundImage = src ? `url(${src})` : "";
+    }
+
+    try {
+      const t = await api.getTournament(id);
+
+      (form.elements.namedItem("name") as HTMLInputElement).value = t.name;
+      (form.elements.namedItem("season") as HTMLInputElement).value = t.season;
+      (form.elements.namedItem("format") as HTMLSelectElement).value = t.format;
+      (form.elements.namedItem("status") as HTMLSelectElement).value = t.status;
+      (form.elements.namedItem("startDate") as HTMLInputElement).value =
+        t.startDate ?? "";
+      (form.elements.namedItem("endDate") as HTMLInputElement).value =
+        t.endDate ?? "";
+      (form.elements.namedItem("pointsWin") as HTMLInputElement).value =
+        String(t.pointsWin);
+      (form.elements.namedItem("pointsDraw") as HTMLInputElement).value =
+        String(t.pointsDraw);
+      (form.elements.namedItem("pointsLoss") as HTMLInputElement).value =
+        String(t.pointsLoss);
+      (form.elements.namedItem("minPlayersPerRoster") as HTMLInputElement).value =
+        String(t.minPlayersPerRoster);
+      (form.elements.namedItem("maxPlayersPerRoster") as HTMLInputElement).value =
+        String(t.maxPlayersPerRoster);
+      (form.elements.namedItem("description") as HTMLTextAreaElement).value =
+        t.description ?? "";
+      paintBanner(t.bannerUrl);
+
+      loading.hidden = true;
+      content.hidden = false;
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearMessages(errorBox);
+        clearMessages(successBox);
+
+        const fd = new FormData(form);
+        const file = (fd.get("banner") as File | null) ?? null;
+        const intOrUndef = (key: string) => {
+          const v = String(fd.get(key) ?? "").trim();
+          if (v === "") return undefined;
+          const n = Number(v);
+          return Number.isFinite(n) ? n : undefined;
+        };
+
+        const payload: UpdateTournamentPayload = {
+          name: String(fd.get("name") ?? "").trim(),
+          season: String(fd.get("season") ?? "").trim(),
+          format: fd.get("format") as UpdateTournamentPayload["format"],
+          status: fd.get("status") as UpdateTournamentPayload["status"],
+          startDate: String(fd.get("startDate") ?? "").trim() || undefined,
+          endDate: String(fd.get("endDate") ?? "").trim() || undefined,
+          pointsWin: intOrUndef("pointsWin"),
+          pointsDraw: intOrUndef("pointsDraw"),
+          pointsLoss: intOrUndef("pointsLoss"),
+          minPlayersPerRoster: intOrUndef("minPlayersPerRoster"),
+          maxPlayersPerRoster: intOrUndef("maxPlayersPerRoster"),
+          description: String(fd.get("description") ?? "").trim() || undefined,
+        };
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Guardando…";
+
+        try {
+          if (file && file.size > 0) {
+            saveBtn.textContent = "Subiendo banner…";
+            const upload = await api.uploadImage(token, file, "tournaments");
+            payload.bannerUrl = upload.url;
+            payload.bannerPublicId = upload.publicId;
+          }
+          saveBtn.textContent = "Guardando…";
+          const updated = await api.updateTournament(token, id, payload);
+          paintBanner(updated.bannerUrl);
+          (form.elements.namedItem("banner") as HTMLInputElement).value = "";
+          setMessages(successBox, ["Torneo actualizado"]);
+        } catch (err) {
+          setMessages(
+            errorBox,
+            err instanceof ApiError ? err.messages : ["Error inesperado"],
+          );
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Guardar cambios";
+        }
+      });
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error";
+    }
+  } else if (!id) {
+    loading.textContent = "Falta el id del torneo";
+  }
+</script>

@@ -1,0 +1,205 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Torneo">
+  <main class="mx-auto max-w-5xl px-6 py-10">
+    <a href="/torneos" class="text-sm text-slate-500 hover:text-slate-700">
+      ← Volver a torneos
+    </a>
+
+    <section
+      id="loading"
+      class="mt-6 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section
+      id="content"
+      hidden
+      class="mt-6 space-y-6"
+    >
+      <header
+        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      >
+        <div
+          id="banner"
+          class="h-40 w-full bg-gradient-to-br from-indigo-500 to-indigo-700"
+        ></div>
+        <div class="px-6 py-5">
+          <span
+            id="status-badge"
+            class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+          ></span>
+          <h1
+            id="name"
+            class="mt-2 text-2xl font-semibold tracking-tight text-slate-900"
+          ></h1>
+          <p id="meta" class="mt-1 text-sm text-slate-500"></p>
+          <p
+            id="description"
+            class="mt-4 whitespace-pre-line text-sm text-slate-600"
+          ></p>
+        </div>
+      </header>
+
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-6 py-4">
+          <h2 class="text-base font-semibold text-slate-900">Equipos inscritos</h2>
+          <p id="teams-count" class="text-xs text-slate-500"></p>
+        </div>
+        <ul
+          id="teams-list"
+          class="divide-y divide-slate-100"
+        >
+        </ul>
+      </section>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    ApiError,
+    cloudinaryUrl,
+    type Tournament,
+    type TournamentTeam,
+  } from "@/lib/api";
+
+  const FORMAT_LABEL: Record<Tournament["format"], string> = {
+    LEAGUE: "Liga",
+    KNOCKOUT: "Eliminatoria",
+    GROUPS_KNOCKOUT: "Grupos + Eliminatoria",
+  };
+
+  const STATUS_LABEL: Record<Tournament["status"], string> = {
+    DRAFT: "Borrador",
+    REGISTRATION: "Inscripciones abiertas",
+    IN_PROGRESS: "En curso",
+    FINISHED: "Finalizado",
+  };
+
+  const STATUS_COLOR: Record<Tournament["status"], string> = {
+    DRAFT: "bg-slate-100 text-slate-600",
+    REGISTRATION: "bg-emerald-100 text-emerald-700",
+    IN_PROGRESS: "bg-indigo-100 text-indigo-700",
+    FINISHED: "bg-slate-100 text-slate-500",
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+
+  function setText(elementId: string, value: string) {
+    document.getElementById(elementId)!.textContent = value;
+  }
+
+  function formatDate(value: string | null): string {
+    if (!value) return "—";
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const d = m
+      ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+      : new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleDateString("es-PE", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  function renderTeamRow(reg: TournamentTeam): HTMLLIElement {
+    const li = document.createElement("li");
+    li.className = "flex items-center gap-4 px-6 py-4";
+
+    const team = reg.team;
+    const logoBox = document.createElement("div");
+    logoBox.className =
+      "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-xs font-semibold text-slate-500";
+
+    const logo = cloudinaryUrl(
+      team?.logoUrl ?? null,
+      "w_80,h_80,c_fill,q_auto,f_auto",
+    );
+    if (logo) {
+      const img = document.createElement("img");
+      img.src = logo;
+      img.alt = team?.name ?? "";
+      img.className = "h-full w-full object-cover";
+      logoBox.appendChild(img);
+    } else {
+      logoBox.textContent = team?.name?.[0]?.toUpperCase() ?? "?";
+    }
+
+    const link = document.createElement("a");
+    link.className = "min-w-0 flex-1 truncate font-medium text-slate-900 hover:underline";
+    link.href = team ? `/equipos/ver?id=${encodeURIComponent(team.id)}` : "#";
+    link.textContent = team?.name ?? reg.teamId;
+
+    li.append(logoBox, link);
+    return li;
+  }
+
+  if (!id) {
+    loading.textContent = "Falta el id del torneo";
+  } else {
+    try {
+      const [t, registrations] = await Promise.all([
+        api.getTournament(id),
+        api.listRegistrations(id),
+      ]);
+
+      setText("name", t.name);
+      setText(
+        "meta",
+        `${FORMAT_LABEL[t.format]} · Temporada ${t.season} · ${formatDate(t.startDate)} → ${formatDate(t.endDate)}`,
+      );
+
+      const badge = document.getElementById("status-badge")!;
+      badge.className =
+        `inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[t.status]}`;
+      badge.textContent = STATUS_LABEL[t.status];
+
+      const banner = document.getElementById("banner")!;
+      const bannerUrl = cloudinaryUrl(
+        t.bannerUrl,
+        "w_1200,h_320,c_fill,q_auto,f_auto",
+      );
+      if (bannerUrl) {
+        banner.style.backgroundImage = `url(${bannerUrl})`;
+        banner.style.backgroundSize = "cover";
+        banner.style.backgroundPosition = "center";
+      }
+
+      const desc = document.getElementById("description") as HTMLElement;
+      if (t.description) {
+        desc.textContent = t.description;
+      } else {
+        desc.hidden = true;
+      }
+
+      const teamsList = document.getElementById("teams-list") as HTMLUListElement;
+      const teamsCount = document.getElementById("teams-count")!;
+      teamsCount.textContent = `${registrations.length} equipo${registrations.length === 1 ? "" : "s"}`;
+
+      if (registrations.length === 0) {
+        const li = document.createElement("li");
+        li.className = "px-6 py-6 text-center text-sm text-slate-500";
+        li.textContent = "Aún no hay equipos inscritos.";
+        teamsList.appendChild(li);
+      } else {
+        teamsList.replaceChildren(...registrations.map(renderTeamRow));
+      }
+
+      loading.hidden = true;
+      content.hidden = false;
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error al cargar";
+    }
+  }
+</script>

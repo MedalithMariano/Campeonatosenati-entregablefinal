@@ -1,0 +1,298 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Field from "@/components/Field.astro";
+import Select from "@/components/Select.astro";
+import Alert from "@/components/Alert.astro";
+import { Plus } from "@lucide/astro";
+---
+
+<Layout title="Admin · Torneos">
+  <main class="mx-auto max-w-5xl px-6 py-10">
+    <header class="flex items-center justify-between">
+      <div>
+        <p class="text-sm font-medium text-indigo-600">Administración</p>
+        <h1 class="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+          Torneos
+        </h1>
+      </div>
+      <button
+        type="button"
+        id="toggle-form"
+        class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700"
+      >
+        <Plus size={16} />
+        Nuevo torneo
+      </button>
+    </header>
+
+    <section
+      id="form-section"
+      hidden
+      class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-100 px-6 py-4">
+        <h2 class="text-base font-semibold text-slate-900">Crear torneo</h2>
+      </div>
+      <form id="create-form" class="space-y-5 px-6 py-5" novalidate>
+        <Alert id="create-error" />
+
+        <Field id="name" label="Nombre" required />
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="season" label="Temporada" placeholder="2026 o 2025-2026" required />
+          <Select
+            id="format"
+            label="Formato"
+            options={[
+              { value: "LEAGUE", label: "Liga" },
+              { value: "KNOCKOUT", label: "Eliminatoria" },
+              { value: "GROUPS_KNOCKOUT", label: "Grupos + Eliminatoria" },
+            ]}
+            required
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="startDate" label="Inicio" type="date" />
+          <Field id="endDate" label="Fin" type="date" />
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <Field id="pointsWin" label="Pts. victoria" type="number" placeholder="3" />
+          <Field id="pointsDraw" label="Pts. empate" type="number" placeholder="1" />
+          <Field id="pointsLoss" label="Pts. derrota" type="number" placeholder="0" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="minPlayersPerRoster" label="Mín. roster" type="number" placeholder="11" />
+          <Field id="maxPlayersPerRoster" label="Máx. roster" type="number" placeholder="25" />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="description" class="block text-sm font-medium text-slate-700">
+            Descripción <span class="text-slate-400 font-normal">· opcional</span>
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            rows="3"
+            class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+          ></textarea>
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="banner" class="block text-sm font-medium text-slate-700">
+            Banner <span class="text-slate-400 font-normal">· opcional</span>
+          </label>
+          <input
+            id="banner"
+            name="banner"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-slate-700"
+          />
+        </div>
+
+        <div class="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            id="cancel-btn"
+            class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            id="submit-btn"
+            class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+          >
+            Crear
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section
+      id="loading"
+      class="mt-8 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <ul
+      id="list"
+      hidden
+      class="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-100"
+    >
+    </ul>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    auth,
+    ApiError,
+    type Tournament,
+    type CreateTournamentPayload,
+  } from "@/lib/api";
+
+  const FORMAT_LABEL: Record<Tournament["format"], string> = {
+    LEAGUE: "Liga",
+    KNOCKOUT: "Eliminatoria",
+    GROUPS_KNOCKOUT: "Grupos + Eliminatoria",
+  };
+
+  const token = auth.requireAdmin();
+  if (!token) {
+    // redirected
+  } else {
+    const loading = document.getElementById("loading") as HTMLElement;
+    const list = document.getElementById("list") as HTMLUListElement;
+    const toggleBtn = document.getElementById("toggle-form") as HTMLButtonElement;
+    const formSection = document.getElementById("form-section") as HTMLElement;
+    const form = document.getElementById("create-form") as HTMLFormElement;
+    const errorBox = document.getElementById("create-error") as HTMLElement;
+    const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+    const cancelBtn = document.getElementById("cancel-btn") as HTMLButtonElement;
+
+    function showError(messages: string[]) {
+      errorBox.replaceChildren(
+        ...messages.map((m) => {
+          const d = document.createElement("div");
+          d.textContent = m;
+          return d;
+        }),
+      );
+      errorBox.hidden = false;
+    }
+    function clearError() {
+      errorBox.hidden = true;
+      errorBox.replaceChildren();
+    }
+
+    function renderRow(t: Tournament): HTMLLIElement {
+      const li = document.createElement("li");
+      li.className = "flex items-center gap-4 px-5 py-4";
+
+      const meta = document.createElement("div");
+      meta.className = "min-w-0 flex-1";
+      const name = document.createElement("p");
+      name.className = "truncate font-medium text-slate-900";
+      name.textContent = t.name;
+      const sub = document.createElement("p");
+      sub.className = "truncate text-xs text-slate-500";
+      sub.textContent = `${FORMAT_LABEL[t.format]} · ${t.season} · ${t.status}`;
+      meta.append(name, sub);
+
+      const teamsLink = document.createElement("a");
+      teamsLink.href = `/admin/torneos/inscripciones?id=${encodeURIComponent(t.id)}`;
+      teamsLink.className =
+        "inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
+      teamsLink.textContent = "Inscripciones";
+
+      const editLink = document.createElement("a");
+      editLink.href = `/admin/torneos/editar?id=${encodeURIComponent(t.id)}`;
+      editLink.className =
+        "inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
+      editLink.textContent = "Editar";
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className =
+        "inline-flex items-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50";
+      delBtn.textContent = "Eliminar";
+      delBtn.addEventListener("click", async () => {
+        if (!confirm(`¿Eliminar el torneo "${t.name}"?`)) return;
+        try {
+          await api.deleteTournament(token, t.id);
+          await refresh();
+        } catch (err) {
+          alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+        }
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "flex items-center gap-2";
+      actions.append(teamsLink, editLink, delBtn);
+
+      li.append(meta, actions);
+      return li;
+    }
+
+    async function refresh() {
+      loading.hidden = false;
+      list.hidden = true;
+      try {
+        const tournaments = await api.listTournaments();
+        loading.hidden = true;
+        list.replaceChildren(...tournaments.map(renderRow));
+        list.hidden = false;
+      } catch (err) {
+        loading.textContent =
+          err instanceof ApiError ? err.messages.join(" · ") : "Error al cargar";
+      }
+    }
+
+    toggleBtn.addEventListener("click", () => {
+      formSection.hidden = !formSection.hidden;
+      clearError();
+      if (!formSection.hidden) form.reset();
+    });
+    cancelBtn.addEventListener("click", () => {
+      formSection.hidden = true;
+      form.reset();
+      clearError();
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearError();
+      const fd = new FormData(form);
+      const file = (fd.get("banner") as File | null) ?? null;
+
+      const intOrUndef = (key: string) => {
+        const n = Number(fd.get(key));
+        return Number.isFinite(n) && n !== 0 ? n : undefined;
+      };
+
+      const payload: CreateTournamentPayload = {
+        name: String(fd.get("name") ?? "").trim(),
+        season: String(fd.get("season") ?? "").trim(),
+        format: fd.get("format") as CreateTournamentPayload["format"],
+        startDate: String(fd.get("startDate") ?? "").trim() || undefined,
+        endDate: String(fd.get("endDate") ?? "").trim() || undefined,
+        pointsWin: intOrUndef("pointsWin"),
+        pointsDraw: intOrUndef("pointsDraw"),
+        pointsLoss: intOrUndef("pointsLoss"),
+        minPlayersPerRoster: intOrUndef("minPlayersPerRoster"),
+        maxPlayersPerRoster: intOrUndef("maxPlayersPerRoster"),
+        description: String(fd.get("description") ?? "").trim() || undefined,
+      };
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creando…";
+
+      try {
+        if (file && file.size > 0) {
+          submitBtn.textContent = "Subiendo banner…";
+          const upload = await api.uploadImage(token, file, "tournaments");
+          payload.bannerUrl = upload.url;
+          payload.bannerPublicId = upload.publicId;
+        }
+        submitBtn.textContent = "Guardando…";
+        await api.createTournament(token, payload);
+        formSection.hidden = true;
+        form.reset();
+        await refresh();
+      } catch (err) {
+        showError(err instanceof ApiError ? err.messages : ["Error inesperado"]);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Crear";
+      }
+    });
+
+    await refresh();
+  }
+</script>
