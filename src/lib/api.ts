@@ -360,6 +360,65 @@ export interface UpsertMatchStatsPayload {
   saves?: number;
 }
 
+export interface StandingRow {
+  teamId: string;
+  team?: {
+    id: string;
+    name: string;
+    shortName: string | null;
+    logoUrl: string | null;
+  };
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+}
+
+export interface StandingsBlock {
+  phaseId: string;
+  phaseName: string;
+  phaseType: PhaseType;
+  groupId: string | null;
+  groupName: string | null;
+  rows: StandingRow[];
+}
+
+export interface LeaderRow {
+  playerId: string;
+  teamId: string;
+  player?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    photoUrl: string | null;
+  };
+  team?: {
+    id: string;
+    name: string;
+    shortName: string | null;
+    logoUrl: string | null;
+  };
+  count: number;
+}
+
+export interface DisciplineRow {
+  playerId: string;
+  teamId: string;
+  player?: LeaderRow["player"];
+  team?: LeaderRow["team"];
+  yellows: number;
+  reds: number;
+  total: number;
+}
+
+export interface SeedKnockoutResult {
+  matchesUpdated: number;
+}
+
 export interface GenerateFixtureResult {
   phasesCreated: number;
   matchesCreated: number;
@@ -752,6 +811,33 @@ export const api = {
       method: "DELETE",
       headers: authHeader(token),
     });
+  },
+
+  seedKnockout(token: string, tournamentId: string) {
+    return request<SeedKnockoutResult>(
+      `/tournaments/${tournamentId}/fixture/seed-knockout`,
+      {
+        method: "POST",
+        headers: authHeader(token),
+      },
+    );
+  },
+
+  // ---- Stats ----
+  listStandings(tournamentId: string) {
+    return request<StandingsBlock[]>(`/tournaments/${tournamentId}/standings`);
+  },
+
+  listTopScorers(tournamentId: string) {
+    return request<LeaderRow[]>(`/tournaments/${tournamentId}/top-scorers`);
+  },
+
+  listTopAssists(tournamentId: string) {
+    return request<LeaderRow[]>(`/tournaments/${tournamentId}/top-assists`);
+  },
+
+  listDiscipline(tournamentId: string) {
+    return request<DisciplineRow[]>(`/tournaments/${tournamentId}/discipline`);
   },
 
   // ---- Matches ----

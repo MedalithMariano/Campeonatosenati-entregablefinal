@@ -70,6 +70,14 @@ import Alert from "@/components/Alert.astro";
             >
               Borrar fixture
             </button>
+            <button
+              id="seed-btn"
+              type="button"
+              hidden
+              class="inline-flex items-center rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Sembrar bracket desde grupos
+            </button>
           </div>
         </div>
       </section>
@@ -134,6 +142,7 @@ import Alert from "@/components/Alert.astro";
     const phasesList = document.getElementById("phases-list") as HTMLUListElement;
     const phasesEmpty = document.getElementById("phases-empty") as HTMLElement;
     const addPhaseBtn = document.getElementById("add-phase-btn") as HTMLButtonElement;
+    const seedBtn = document.getElementById("seed-btn") as HTMLButtonElement;
     const generateBtn = document.getElementById("generate-btn") as HTMLButtonElement;
     const dropBtn = document.getElementById("drop-btn") as HTMLButtonElement;
     const genError = document.getElementById("generator-error") as HTMLElement;
@@ -596,6 +605,37 @@ import Alert from "@/components/Alert.astro";
 
       titleEl.textContent = tournament.name;
       subtitleEl.textContent = `${tournament.season} · ${tournament.format} · ${registrations.length} equipos inscritos`;
+
+      if (tournament.format === "GROUPS_KNOCKOUT") {
+        seedBtn.hidden = false;
+        seedBtn.addEventListener("click", async () => {
+          if (
+            !confirm(
+              "¿Sembrar el bracket con los clasificados de la fase de grupos? Requiere que todos los partidos de grupos estén FINALIZADOS.",
+            )
+          )
+            return;
+          clearMessages(genError);
+          clearMessages(genSuccess);
+          seedBtn.disabled = true;
+          seedBtn.textContent = "Sembrando…";
+          try {
+            const result = await api.seedKnockout(token, tournamentId!);
+            setMessages(genSuccess, [
+              `Bracket sembrado: ${result.matchesUpdated} llave(s) actualizada(s).`,
+            ]);
+            await refresh();
+          } catch (err) {
+            setMessages(
+              genError,
+              err instanceof ApiError ? err.messages : ["Error inesperado"],
+            );
+          } finally {
+            seedBtn.disabled = false;
+            seedBtn.textContent = "Sembrar bracket desde grupos";
+          }
+        });
+      }
 
       await refresh();
 
