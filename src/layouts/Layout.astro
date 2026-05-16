@@ -1,4 +1,4 @@
----
+﻿---
 import "../styles/global.css";
 import NavBar from "@/components/NavBar.astro";
 
@@ -20,7 +20,7 @@ const { title = "Campeonato", hideNav = false } = Astro.props;
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
   </head>
-  <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
+  <body class="min-h-screen bg-blue-950 text-slate-900 antialiased">
     {!hideNav && <NavBar />}
     <slot />
   </body>
