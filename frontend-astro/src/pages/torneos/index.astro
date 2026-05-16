@@ -1,0 +1,317 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Nuevo Torneo">
+  <main class="mx-auto max-w-2xl px-6 py-10">
+    <a href="/torneos" class="text-sm text-slate-500 hover:text-slate-700">
+      ← Volver a torneos
+    </a>
+
+    <div class="mt-6">
+      <p class="text-sm font-medium text-indigo-600">Torneos</p>
+      <h1 class="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+        Nuevo torneo
+      </h1>
+    </div>
+
+    <div id="error-box" hidden class="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600"></div>
+
+    <form id="form" class="mt-8 space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+
+      <!-- Banner -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-2">Banner del torneo</label>
+        <div
+          id="banner-preview"
+          class="relative flex h-36 w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-100 text-sm text-slate-400 border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50"
+        >
+          <div id="banner-placeholder" class="text-center">
+            <p class="text-2xl">🏆</p>
+            <p class="mt-1 text-xs">Haz clic para subir banner</p>
+          </div>
+          <img id="banner-img" hidden class="absolute inset-0 h-full w-full object-cover rounded-2xl" />
+        </div>
+        <input id="banner-input" type="file" accept="image/*" class="hidden" />
+        <p id="upload-status" class="mt-1 text-xs text-indigo-600 hidden">Subiendo imagen…</p>
+      </div>
+
+      <hr class="border-slate-100" />
+
+      <!-- Nombre y temporada -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="name" class="block text-sm font-medium text-slate-700">
+            Nombre <span class="text-red-500">*</span>
+          </label>
+          <input
+            id="name"
+            type="text"
+            required
+            placeholder="Ej: Liga Deportiva 2025"
+            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+        <div>
+          <label for="season" class="block text-sm font-medium text-slate-700">
+            Temporada <span class="text-red-500">*</span>
+          </label>
+          <input
+            id="season"
+            type="text"
+            required
+            placeholder="Ej: 2025"
+            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+      </div>
+
+      <!-- Formato y estado -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="format" class="block text-sm font-medium text-slate-700">
+            Formato <span class="text-red-500">*</span>
+          </label>
+          <select
+            id="format"
+            required
+            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          >
+            <option value="LEAGUE">🏅 Liga (todos contra todos)</option>
+            <option value="KNOCKOUT">⚡ Eliminación directa</option>
+            <option value="GROUPS_KNOCKOUT">🏆 Grupos + Eliminación</option>
+          </select>
+        </div>
+        <div>
+          <label for="status" class="block text-sm font-medium text-slate-700">Estado</label>
+          <select
+            id="status"
+            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          >
+            <option value="DRAFT">📝 Borrador</option>
+            <option value="REGISTRATION">📋 Inscripciones abiertas</option>
+            <option value="IN_PROGRESS">⚽ En curso</option>
+            <option value="FINISHED">🏁 Finalizado</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Fechas -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="start-date" class="block text-sm font-medium text-slate-700">Fecha de inicio</label>
+          <input
+            id="start-date"
+            type="date"
+            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+        <div>
+          <label for="end-date" class="block text-sm font-medium text-slate-700">Fecha de fin</label>
+          <input
+            id="end-date"
+            type="date"
+            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+      </div>
+
+      <!-- Puntos -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-2">Sistema de puntos</label>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label for="points-win" class="block text-xs text-slate-500">Victoria</label>
+            <input
+              id="points-win"
+              type="number"
+              value="3"
+              min="0"
+              class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+          <div>
+            <label for="points-draw" class="block text-xs text-slate-500">Empate</label>
+            <input
+              id="points-draw"
+              type="number"
+              value="1"
+              min="0"
+              class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+          <div>
+            <label for="points-loss" class="block text-xs text-slate-500">Derrota</label>
+            <input
+              id="points-loss"
+              type="number"
+              value="0"
+              min="0"
+              class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Roster -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-2">Jugadores por roster</label>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="min-players" class="block text-xs text-slate-500">Mínimo</label>
+            <input
+              id="min-players"
+              type="number"
+              value="11"
+              min="1"
+              class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+          <div>
+            <label for="max-players" class="block text-xs text-slate-500">Máximo</label>
+            <input
+              id="max-players"
+              type="number"
+              value="25"
+              min="1"
+              class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Descripción -->
+      <div>
+        <label for="description" class="block text-sm font-medium text-slate-700">Descripción</label>
+        <textarea
+          id="description"
+          rows="3"
+          placeholder="Descripción opcional del torneo…"
+          class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 resize-none"
+        ></textarea>
+      </div>
+
+      <!-- Botones -->
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <a
+          href="/torneos"
+          class="rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          Cancelar
+        </a>
+        <button
+          id="submit-btn"
+          type="submit"
+          class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+        >
+          Crear torneo
+        </button>
+      </div>
+    </form>
+  </main>
+</Layout>
+
+<script>
+  import { api, ApiError, auth } from "@/lib/api";
+
+  const token = auth.requireAdmin();
+  if (!token) throw new Error("No autorizado");
+
+  const form = document.getElementById("form") as HTMLFormElement;
+  const errorBox = document.getElementById("error-box") as HTMLElement;
+  const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+  const bannerInput = document.getElementById("banner-input") as HTMLInputElement;
+  const bannerPreview = document.getElementById("banner-preview") as HTMLElement;
+  const bannerImg = document.getElementById("banner-img") as HTMLImageElement;
+  const bannerPlaceholder = document.getElementById("banner-placeholder") as HTMLElement;
+  const uploadStatus = document.getElementById("upload-status") as HTMLElement;
+
+  let uploadedBannerUrl: string | null = null;
+  let uploadedBannerPublicId: string | null = null;
+
+  // Clic en banner para abrir selector
+  bannerPreview.addEventListener("click", () => bannerInput.click());
+
+  // Preview y subida de banner
+  bannerInput.addEventListener("change", async () => {
+    const file = bannerInput.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      bannerImg.src = e.target?.result as string;
+      bannerImg.hidden = false;
+      bannerPlaceholder.hidden = true;
+    };
+    reader.readAsDataURL(file);
+
+    uploadStatus.hidden = false;
+    uploadStatus.textContent = "Subiendo imagen…";
+    uploadStatus.className = "mt-1 text-xs text-indigo-600";
+    try {
+      const uploaded = await api.uploadImage(token!, file, "tournaments");
+      uploadedBannerUrl = uploaded.url;
+      uploadedBannerPublicId = uploaded.publicId;
+      uploadStatus.textContent = "✓ Banner subido";
+      uploadStatus.className = "mt-1 text-xs text-green-600";
+    } catch {
+      uploadStatus.textContent = "Error al subir banner";
+      uploadStatus.className = "mt-1 text-xs text-red-600";
+    }
+  });
+
+  // Submit
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorBox.hidden = true;
+
+    const name = (document.getElementById("name") as HTMLInputElement).value.trim();
+    const season = (document.getElementById("season") as HTMLInputElement).value.trim();
+    const format = (document.getElementById("format") as HTMLSelectElement).value as any;
+    const status = (document.getElementById("status") as HTMLSelectElement).value as any;
+    const startDate = (document.getElementById("start-date") as HTMLInputElement).value;
+    const endDate = (document.getElementById("end-date") as HTMLInputElement).value;
+    const pointsWin = parseInt((document.getElementById("points-win") as HTMLInputElement).value);
+    const pointsDraw = parseInt((document.getElementById("points-draw") as HTMLInputElement).value);
+    const pointsLoss = parseInt((document.getElementById("points-loss") as HTMLInputElement).value);
+    const minPlayers = parseInt((document.getElementById("min-players") as HTMLInputElement).value);
+    const maxPlayers = parseInt((document.getElementById("max-players") as HTMLInputElement).value);
+    const description = (document.getElementById("description") as HTMLTextAreaElement).value.trim();
+
+    if (!name || !season) {
+      errorBox.textContent = "El nombre y la temporada son obligatorios.";
+      errorBox.hidden = false;
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creando…";
+
+    try {
+      const torneo = await api.createTournament(token!, {
+        name,
+        season,
+        format,
+        status,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        pointsWin,
+        pointsDraw,
+        pointsLoss,
+        minPlayersPerRoster: minPlayers,
+        maxPlayersPerRoster: maxPlayers,
+        description: description || undefined,
+        bannerUrl: uploadedBannerUrl ?? undefined,
+        bannerPublicId: uploadedBannerPublicId ?? undefined,
+      });
+
+      window.location.href = `/torneos/ver?id=${torneo.id}`;
+    } catch (err) {
+      errorBox.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error al crear torneo";
+      errorBox.hidden = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Crear torneo";
+    }
+  });
+</script>

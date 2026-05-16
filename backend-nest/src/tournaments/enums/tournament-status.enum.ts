@@ -1,0 +1,6 @@
+export enum TournamentStatus {
+  DRAFT = 'DRAFT',
+  REGISTRATION = 'REGISTRATION',
+  IN_PROGRESS = 'IN_PROGRESS',
+  FINISHED = 'FINISHED',
+}

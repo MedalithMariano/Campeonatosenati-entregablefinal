@@ -1,0 +1,674 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Torneo">
+  <main class="mx-auto max-w-5xl px-6 py-10">
+    <a href="/torneos" class="text-sm text-slate-500 hover:text-slate-700">
+      ← Volver a torneos
+    </a>
+
+    <section
+      id="loading"
+      class="mt-6 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section id="content" hidden class="mt-6 space-y-6">
+      <header
+        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      >
+        <div
+          id="banner"
+          class="h-40 w-full bg-gradient-to-br from-indigo-500 to-indigo-700"
+        >
+        </div>
+        <div class="px-6 py-5">
+          <span
+            id="status-badge"
+            class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+          ></span>
+          <h1
+            id="name"
+            class="mt-2 text-2xl font-semibold tracking-tight text-slate-900"
+          ></h1>
+          <p id="meta" class="mt-1 text-sm text-slate-500"></p>
+        </div>
+      </header>
+
+      <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <nav
+          id="tabs"
+          class="flex gap-1 border-b border-slate-100 p-2"
+          role="tablist"
+        ></nav>
+        <div id="tab-content" class="p-6"></div>
+      </div>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    ApiError,
+    cloudinaryUrl,
+    type DisciplineRow,
+    type LeaderRow,
+    type Match,
+    type StandingsBlock,
+    type Tournament,
+  } from "@/lib/api";
+
+  const FORMAT_LABEL: Record<Tournament["format"], string> = {
+    LEAGUE: "Liga",
+    KNOCKOUT: "Eliminatoria",
+    GROUPS_KNOCKOUT: "Grupos + Eliminatoria",
+  };
+
+  const STATUS_LABEL: Record<Tournament["status"], string> = {
+    DRAFT: "Borrador",
+    REGISTRATION: "Inscripciones abiertas",
+    IN_PROGRESS: "En curso",
+    FINISHED: "Finalizado",
+  };
+
+  const STATUS_COLOR: Record<Tournament["status"], string> = {
+    DRAFT: "bg-slate-100 text-slate-600",
+    REGISTRATION: "bg-emerald-100 text-emerald-700",
+    IN_PROGRESS: "bg-indigo-100 text-indigo-700",
+    FINISHED: "bg-slate-100 text-slate-500",
+  };
+
+  const MATCH_STATUS_LABEL: Record<Match["status"], string> = {
+    SCHEDULED: "Programado",
+    LIVE: "En vivo",
+    FINISHED: "Finalizado",
+    POSTPONED: "Postergado",
+    CANCELLED: "Cancelado",
+  };
+
+  const PHASE_LABEL: Record<NonNullable<Match["phase"]>["type"], string> = {
+    LEAGUE: "Liga",
+    GROUP_STAGE: "Fase de grupos",
+    ROUND_OF_16: "Octavos",
+    QUARTERFINAL: "Cuartos",
+    SEMIFINAL: "Semifinales",
+    FINAL: "Final",
+    THIRD_PLACE: "Tercer puesto",
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+  const tabsNav = document.getElementById("tabs") as HTMLElement;
+  const tabContent = document.getElementById("tab-content") as HTMLElement;
+
+  type TabId =
+    | "info"
+    | "teams"
+    | "standings"
+    | "calendar"
+    | "results"
+    | "scorers"
+    | "discipline"
+    | "bracket";
+
+  function setText(elId: string, value: string) {
+    document.getElementById(elId)!.textContent = value;
+  }
+
+  function formatDate(value: string | null): string {
+    if (!value) return "—";
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const d = m
+      ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+      : new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleDateString("es-PE", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  function fmtKickoff(value: string | null): string {
+    if (!value) return "Sin fecha";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString("es-PE", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function fmtScore(m: Match): string {
+    if (m.homeScore == null || m.awayScore == null) return "—";
+    let s = `${m.homeScore} - ${m.awayScore}`;
+    if (m.homePenalties != null && m.awayPenalties != null) {
+      s += ` (pen. ${m.homePenalties}-${m.awayPenalties})`;
+    }
+    return s;
+  }
+
+  function teamLink(
+    _teamId: string | null,
+    name: string | null,
+  ): HTMLElement {
+    const span = document.createElement("span");
+    if (!name) {
+      span.className = "text-slate-400";
+      span.textContent = "Por definir";
+    } else {
+      span.className = "truncate";
+      span.textContent = name;
+    }
+    return span;
+  }
+
+  if (!id) {
+    loading.textContent = "Falta el id del torneo";
+  } else {
+    try {
+      const [t, registrations, matches, standings, scorers, discipline] =
+        await Promise.all([
+          api.getTournament(id),
+          api.listRegistrations(id),
+          api.listMatches(id),
+          api.listStandings(id).catch(() => [] as StandingsBlock[]),
+          api.listTopScorers(id).catch(() => [] as LeaderRow[]),
+          api.listDiscipline(id).catch(() => [] as DisciplineRow[]),
+        ]);
+
+      setText("name", t.name);
+      setText(
+        "meta",
+        `${FORMAT_LABEL[t.format]} · Temporada ${t.season} · ${formatDate(t.startDate)} → ${formatDate(t.endDate)}`,
+      );
+      const badge = document.getElementById("status-badge")!;
+      badge.className =
+        `inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[t.status]}`;
+      badge.textContent = STATUS_LABEL[t.status];
+
+      const banner = document.getElementById("banner")!;
+      const bannerUrl = cloudinaryUrl(
+        t.bannerUrl,
+        "w_1200,h_320,c_fill,q_auto,f_auto",
+      );
+      if (bannerUrl) {
+        banner.style.backgroundImage = `url(${bannerUrl})`;
+        banner.style.backgroundSize = "cover";
+        banner.style.backgroundPosition = "center";
+      }
+
+      function buildTabs(active: TabId) {
+        const tabs: Array<{ id: TabId; label: string }> = [
+          { id: "info", label: "Info" },
+          { id: "teams", label: "Equipos" },
+          { id: "standings", label: "Tabla" },
+          { id: "calendar", label: "Calendario" },
+          { id: "results", label: "Resultados" },
+          { id: "scorers", label: "Goleadores" },
+          { id: "discipline", label: "Tarjetas" },
+          { id: "bracket", label: "Bracket" },
+        ];
+        tabsNav.replaceChildren(
+          ...tabs.map(({ id: tabId, label }) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.role = "tab";
+            const isActive = tabId === active;
+            btn.className = isActive
+              ? "rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white"
+              : "rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100";
+            btn.textContent = label;
+            btn.addEventListener("click", () => render(tabId));
+            return btn;
+          }),
+        );
+      }
+
+      function renderInfo() {
+        if (t.description) {
+          const p = document.createElement("p");
+          p.className = "whitespace-pre-line text-sm text-slate-600";
+          p.textContent = t.description;
+          tabContent.append(p);
+        } else {
+          const empty = document.createElement("p");
+          empty.className = "text-sm text-slate-500";
+          empty.textContent = "Sin descripción.";
+          tabContent.append(empty);
+        }
+      }
+
+      function renderTeams() {
+        if (registrations.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "text-center text-sm text-slate-500";
+          empty.textContent = "Aún no hay equipos inscritos.";
+          tabContent.append(empty);
+          return;
+        }
+        const ul = document.createElement("ul");
+        ul.className = "divide-y divide-slate-100";
+        for (const r of registrations) {
+          const li = document.createElement("li");
+          li.className = "flex items-center gap-3 py-3";
+          const logoBox = document.createElement("div");
+          logoBox.className =
+            "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-xs font-semibold text-slate-500";
+          const logo = cloudinaryUrl(
+            r.team?.logoUrl ?? null,
+            "w_80,h_80,c_fill,q_auto,f_auto",
+          );
+          if (logo) {
+            const img = document.createElement("img");
+            img.src = logo;
+            img.alt = r.team?.name ?? "";
+            img.className = "h-full w-full object-cover";
+            logoBox.appendChild(img);
+          } else {
+            logoBox.textContent = r.team?.name?.[0]?.toUpperCase() ?? "?";
+          }
+          const link = document.createElement("a");
+          link.href = r.team
+            ? `/equipos/ver?id=${encodeURIComponent(r.team.id)}`
+            : "#";
+          link.className = "font-medium text-slate-900 hover:underline";
+          link.textContent = r.team?.name ?? r.teamId;
+          li.append(logoBox, link);
+          ul.append(li);
+        }
+        tabContent.append(ul);
+      }
+
+      function renderMatchList(active: "calendar" | "results") {
+        const wanted =
+          active === "calendar"
+            ? matches.filter(
+                (m) => m.status !== "FINISHED" && m.status !== "CANCELLED",
+              )
+            : matches.filter((m) => m.status === "FINISHED");
+
+        if (wanted.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "text-center text-sm text-slate-500";
+          empty.textContent =
+            active === "calendar"
+              ? "No hay partidos programados."
+              : "Aún no hay resultados.";
+          tabContent.append(empty);
+          return;
+        }
+
+        const byPhase = new Map<string, Match[]>();
+        for (const m of wanted) {
+          const list = byPhase.get(m.phaseId) ?? [];
+          list.push(m);
+          byPhase.set(m.phaseId, list);
+        }
+
+        for (const [, list] of byPhase) {
+          const phase = list[0].phase;
+          const section = document.createElement("section");
+          section.className = "mb-6 last:mb-0";
+          const h = document.createElement("h3");
+          h.className =
+            "mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500";
+          h.textContent = phase
+            ? `${PHASE_LABEL[phase.type]} · ${phase.name}`
+            : "Fase";
+          section.append(h);
+
+          const ul = document.createElement("ul");
+          ul.className =
+            "overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100";
+          for (const m of list) {
+            const li = document.createElement("li");
+            li.className = "p-0";
+            const a = document.createElement("a");
+            a.href = `/partidos/ver?id=${encodeURIComponent(m.id)}`;
+            a.className =
+              "grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3 transition hover:bg-slate-50";
+            const home = document.createElement("div");
+            home.className = "min-w-0 text-right font-medium";
+            home.appendChild(teamLink(m.homeTeamId, m.homeTeam?.name ?? null));
+            const center = document.createElement("div");
+            center.className = "text-center";
+            if (active === "results") {
+              const score = document.createElement("p");
+              score.className = "font-mono text-base font-semibold text-slate-900";
+              score.textContent = fmtScore(m);
+              const sub = document.createElement("p");
+              sub.className = "text-xs text-slate-500";
+              sub.textContent = MATCH_STATUS_LABEL[m.status];
+              center.append(score, sub);
+            } else {
+              const time = document.createElement("p");
+              time.className = "text-xs text-slate-700";
+              time.textContent = fmtKickoff(m.kickoff);
+              const sub = document.createElement("p");
+              sub.className = "text-xs text-slate-500";
+              sub.textContent = m.matchDay
+                ? `Jornada ${m.matchDay.number}`
+                : MATCH_STATUS_LABEL[m.status];
+              center.append(time, sub);
+            }
+            const away = document.createElement("div");
+            away.className = "min-w-0 font-medium";
+            away.appendChild(teamLink(m.awayTeamId, m.awayTeam?.name ?? null));
+            a.append(home, center, away);
+            li.append(a);
+            ul.append(li);
+          }
+          section.append(ul);
+          tabContent.append(section);
+        }
+      }
+
+      function renderBracket() {
+        const knockout = matches.filter((m) => m.bracketRound != null);
+        if (knockout.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "text-center text-sm text-slate-500";
+          empty.textContent =
+            "Este torneo no tiene fase de eliminatorias generada.";
+          tabContent.append(empty);
+          return;
+        }
+        const byRound = new Map<number, Match[]>();
+        for (const m of knockout) {
+          const list = byRound.get(m.bracketRound!) ?? [];
+          list.push(m);
+          byRound.set(m.bracketRound!, list);
+        }
+        const rounds = Array.from(byRound.keys()).sort((a, b) => a - b);
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "overflow-x-auto";
+        const grid = document.createElement("div");
+        grid.className = "flex gap-4 min-w-max";
+
+        for (const round of rounds) {
+          const col = document.createElement("div");
+          col.className = "flex w-56 flex-col gap-3";
+          const list = byRound.get(round)!;
+          list.sort(
+            (a, b) => (a.bracketPosition ?? 0) - (b.bracketPosition ?? 0),
+          );
+          const h = document.createElement("h4");
+          h.className =
+            "text-center text-xs font-semibold uppercase tracking-wide text-slate-500";
+          h.textContent = list[0].phase
+            ? PHASE_LABEL[list[0].phase.type]
+            : `Ronda ${round}`;
+          col.append(h);
+          for (const m of list) {
+            const card = document.createElement("a");
+            card.href = `/partidos/ver?id=${encodeURIComponent(m.id)}`;
+            card.className =
+              "block rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:shadow-md";
+
+            function teamSpan(name: string | null | undefined): HTMLSpanElement {
+              const span = document.createElement("span");
+              if (!name) {
+                span.className = "text-slate-400";
+                span.textContent = "Por definir";
+              } else {
+                span.className = "truncate";
+                span.textContent = name;
+              }
+              return span;
+            }
+
+            const homeRow = document.createElement("div");
+            homeRow.className = "flex items-center justify-between text-sm";
+            homeRow.appendChild(teamSpan(m.homeTeam?.name ?? null));
+            const homeScore = document.createElement("span");
+            homeScore.className = "font-mono text-slate-700";
+            homeScore.textContent = m.homeScore?.toString() ?? "";
+            homeRow.append(homeScore);
+
+            const awayRow = document.createElement("div");
+            awayRow.className =
+              "mt-1 flex items-center justify-between text-sm";
+            awayRow.appendChild(teamSpan(m.awayTeam?.name ?? null));
+            const awayScore = document.createElement("span");
+            awayScore.className = "font-mono text-slate-700";
+            awayScore.textContent = m.awayScore?.toString() ?? "";
+            awayRow.append(awayScore);
+
+            card.append(homeRow, awayRow);
+
+            if (
+              m.homePenalties != null &&
+              m.awayPenalties != null &&
+              m.homeScore != null &&
+              m.awayScore != null &&
+              m.homeScore === m.awayScore
+            ) {
+              const pen = document.createElement("p");
+              pen.className = "mt-2 text-center text-xs text-slate-500";
+              pen.textContent = `Pen. ${m.homePenalties}-${m.awayPenalties}`;
+              card.append(pen);
+            }
+
+            col.append(card);
+          }
+          grid.append(col);
+        }
+        wrapper.append(grid);
+        tabContent.append(wrapper);
+      }
+
+      function teamLogoSmall(
+        logoUrl: string | null | undefined,
+        name: string,
+      ): HTMLDivElement {
+        const box = document.createElement("div");
+        box.className =
+          "flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded bg-slate-100 text-[10px] font-semibold text-slate-500";
+        const src = cloudinaryUrl(logoUrl ?? null, "w_40,h_40,c_fill,q_auto,f_auto");
+        if (src) {
+          const img = document.createElement("img");
+          img.src = src;
+          img.alt = name;
+          img.className = "h-full w-full object-cover";
+          box.append(img);
+        } else {
+          box.textContent = name[0]?.toUpperCase() ?? "?";
+        }
+        return box;
+      }
+
+      function renderStandings() {
+        if (standings.length === 0) {
+          const p = document.createElement("p");
+          p.className = "text-center text-sm text-slate-500";
+          p.textContent =
+            "Aún no hay tabla. Solo se calcula para liga y fase de grupos con partidos finalizados.";
+          tabContent.append(p);
+          return;
+        }
+        for (const block of standings) {
+          const section = document.createElement("section");
+          section.className = "mb-6 last:mb-0";
+          const h = document.createElement("h3");
+          h.className =
+            "mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500";
+          h.textContent = block.groupName
+            ? `${block.phaseName} · Grupo ${block.groupName}`
+            : block.phaseName;
+          section.append(h);
+
+          const table = document.createElement("table");
+          table.className =
+            "w-full overflow-hidden rounded-xl border border-slate-200 bg-white text-sm";
+
+          const thead = document.createElement("thead");
+          thead.className = "bg-slate-50 text-xs font-medium text-slate-500";
+          const trh = document.createElement("tr");
+          for (const label of ["#", "Equipo", "PJ", "G", "E", "P", "GF", "GC", "DG", "Pts"]) {
+            const th = document.createElement("th");
+            th.className = "px-2 py-2 text-center first:text-left first:pl-4";
+            th.textContent = label;
+            trh.append(th);
+          }
+          thead.append(trh);
+          table.append(thead);
+
+          const tbody = document.createElement("tbody");
+          tbody.className = "divide-y divide-slate-100";
+          block.rows.forEach((row, idx) => {
+            const tr = document.createElement("tr");
+            const pos = document.createElement("td");
+            pos.className = "px-2 py-2 pl-4 font-mono text-xs text-slate-500";
+            pos.textContent = String(idx + 1);
+            const team = document.createElement("td");
+            team.className = "px-2 py-2";
+            const wrap = document.createElement("div");
+            wrap.className = "flex items-center gap-2";
+            wrap.append(
+              teamLogoSmall(row.team?.logoUrl, row.team?.name ?? "?"),
+              (() => {
+                const span = document.createElement("span");
+                span.className = "truncate font-medium text-slate-900";
+                span.textContent = row.team?.name ?? row.teamId;
+                return span;
+              })(),
+            );
+            team.append(wrap);
+            tr.append(pos, team);
+            for (const value of [
+              row.played,
+              row.won,
+              row.drawn,
+              row.lost,
+              row.goalsFor,
+              row.goalsAgainst,
+              row.goalDifference,
+              row.points,
+            ]) {
+              const td = document.createElement("td");
+              td.className =
+                "px-2 py-2 text-center font-mono text-xs text-slate-700";
+              td.textContent = String(value);
+              tr.append(td);
+            }
+            // Highlight Pts column
+            (tr.lastElementChild as HTMLElement).className =
+              "px-2 py-2 text-center font-mono text-xs font-bold text-slate-900";
+            tbody.append(tr);
+          });
+          table.append(tbody);
+          section.append(table);
+          tabContent.append(section);
+        }
+      }
+
+      function renderScorers() {
+        if (scorers.length === 0) {
+          const p = document.createElement("p");
+          p.className = "text-center text-sm text-slate-500";
+          p.textContent = "Aún no hay goles registrados.";
+          tabContent.append(p);
+          return;
+        }
+        const ul = document.createElement("ul");
+        ul.className = "divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white";
+        scorers.forEach((row, idx) => {
+          const li = document.createElement("li");
+          li.className = "flex items-center gap-3 px-4 py-3 text-sm";
+          const pos = document.createElement("span");
+          pos.className = "w-6 text-center font-mono text-xs text-slate-500";
+          pos.textContent = `${idx + 1}`;
+          const player = document.createElement("div");
+          player.className = "min-w-0 flex-1";
+          const name = document.createElement("p");
+          name.className = "truncate font-medium text-slate-900";
+          name.textContent = row.player
+            ? `${row.player.firstName} ${row.player.lastName}`
+            : row.playerId;
+          const team = document.createElement("p");
+          team.className = "truncate text-xs text-slate-500";
+          team.textContent = row.team?.name ?? "";
+          player.append(name, team);
+          const goals = document.createElement("span");
+          goals.className = "font-mono text-sm font-semibold text-slate-900";
+          goals.textContent = `${row.count} ⚽`;
+          li.append(pos, player, goals);
+          ul.append(li);
+        });
+        tabContent.append(ul);
+      }
+
+      function renderDiscipline() {
+        if (discipline.length === 0) {
+          const p = document.createElement("p");
+          p.className = "text-center text-sm text-slate-500";
+          p.textContent = "Sin tarjetas registradas.";
+          tabContent.append(p);
+          return;
+        }
+        const ul = document.createElement("ul");
+        ul.className =
+          "divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white";
+        discipline.forEach((row, idx) => {
+          const li = document.createElement("li");
+          li.className = "flex items-center gap-3 px-4 py-3 text-sm";
+          const pos = document.createElement("span");
+          pos.className = "w-6 text-center font-mono text-xs text-slate-500";
+          pos.textContent = `${idx + 1}`;
+          const player = document.createElement("div");
+          player.className = "min-w-0 flex-1";
+          const name = document.createElement("p");
+          name.className = "truncate font-medium text-slate-900";
+          name.textContent = row.player
+            ? `${row.player.firstName} ${row.player.lastName}`
+            : row.playerId;
+          const team = document.createElement("p");
+          team.className = "truncate text-xs text-slate-500";
+          team.textContent = row.team?.name ?? "";
+          player.append(name, team);
+          const yellows = document.createElement("span");
+          yellows.className = "font-mono text-xs";
+          yellows.textContent = `🟨 ${row.yellows}`;
+          const reds = document.createElement("span");
+          reds.className = "font-mono text-xs";
+          reds.textContent = `🟥 ${row.reds}`;
+          li.append(pos, player, yellows, reds);
+          ul.append(li);
+        });
+        tabContent.append(ul);
+      }
+
+      function render(active: TabId) {
+        buildTabs(active);
+        tabContent.innerHTML = "";
+        if (active === "info") renderInfo();
+        else if (active === "teams") renderTeams();
+        else if (active === "standings") renderStandings();
+        else if (active === "calendar") renderMatchList("calendar");
+        else if (active === "results") renderMatchList("results");
+        else if (active === "scorers") renderScorers();
+        else if (active === "discipline") renderDiscipline();
+        else if (active === "bracket") renderBracket();
+      }
+
+      render("info");
+
+      loading.hidden = true;
+      content.hidden = false;
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error al cargar";
+    }
+  }
+</script>

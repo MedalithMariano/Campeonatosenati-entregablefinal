@@ -1,0 +1,42 @@
+﻿---
+import Layout from "@/layouts/Layout.astro";
+import { Shield, Users as UsersIcon, Trophy, Newspaper, Wallet } from "@lucide/astro";
+---
+
+<Layout title="Admin">
+  <main class="mx-auto max-w-5xl px-6 py-10">
+    <header>
+      <p class="text-sm font-medium text-blue-300">Administración</p>
+      <h1 class="mt-1 text-2xl font-semibold tracking-tight text-white">Panel</h1>
+      <p class="mt-2 text-sm text-blue-200">Gestión de catálogo del campeonato.</p>
+    </header>
+    <section id="content" hidden class="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <a href="/admin/torneos" class="group flex items-center gap-4 rounded-2xl border border-blue-800 bg-blue-900 p-6 shadow-sm transition hover:bg-blue-800">
+        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><Trophy size={22} /></span>
+        <div><p class="font-semibold text-white">Torneos</p><p class="text-sm text-blue-200">Crear torneos, inscribir equipos y armar rosters.</p></div>
+      </a>
+      <a href="/admin/equipos" class="group flex items-center gap-4 rounded-2xl border border-blue-800 bg-blue-900 p-6 shadow-sm transition hover:bg-blue-800">
+        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700"><Shield size={22} /></span>
+        <div><p class="font-semibold text-white">Equipos</p><p class="text-sm text-blue-200">Crear, editar y eliminar equipos.</p></div>
+      </a>
+      <a href="/admin/jugadores" class="group flex items-center gap-4 rounded-2xl border border-blue-800 bg-blue-900 p-6 shadow-sm transition hover:bg-blue-800">
+        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><UsersIcon size={22} /></span>
+        <div><p class="font-semibold text-white">Jugadores</p><p class="text-sm text-blue-200">Catálogo de jugadores con foto y documento.</p></div>
+      </a>
+      <a href="/admin/noticias" class="group flex items-center gap-4 rounded-2xl border border-blue-800 bg-blue-900 p-6 shadow-sm transition hover:bg-blue-800">
+        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-orange-700"><Newspaper size={22} /></span>
+        <div><p class="font-semibold text-white">Noticias y anuncios</p><p class="text-sm text-blue-200">Publicar novedades del torneo, cambios de horario o sanciones.</p></div>
+      </a>
+      <a href="/admin/pagos" class="group flex items-center gap-4 rounded-2xl border border-blue-800 bg-blue-900 p-6 shadow-sm transition hover:bg-blue-800">
+        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 text-green-700"><Wallet size={22} /></span>
+        <div><p class="font-semibold text-white">Pagos</p><p class="text-sm text-blue-200">Registrar si los equipos pagaron su inscripción y hacer seguimiento de deudas.</p></div>
+      </a>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import { auth } from "@/lib/api";
+  const token = auth.requireAdmin();
+  if (token) { document.getElementById("content")!.hidden = false; }
+</script>

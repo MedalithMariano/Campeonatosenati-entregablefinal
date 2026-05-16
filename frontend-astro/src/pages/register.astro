@@ -1,0 +1,160 @@
+---
+import AuthLayout from "@/layouts/AuthLayout.astro";
+import Field from "@/components/Field.astro";
+import Select from "@/components/Select.astro";
+import Alert from "@/components/Alert.astro";
+
+const documentOptions = [
+  { value: "DNI", label: "DNI" },
+  { value: "CE", label: "Carnet de extranjería" },
+  { value: "PASAPORTE", label: "Pasaporte" },
+  { value: "RUC", label: "RUC" },
+];
+---
+
+<AuthLayout
+  title="Crear cuenta"
+  subtitle="Completa tus datos para registrarte"
+>
+  <form id="register-form" class="space-y-5" novalidate>
+    <Alert id="register-error" />
+
+    <Field
+      id="email"
+      label="Correo electrónico"
+      type="email"
+      placeholder="tu@correo.com"
+      autocomplete="email"
+      required
+    />
+
+    <Field
+      id="password"
+      label="Contraseña"
+      type="password"
+      placeholder="Mínimo 6 caracteres"
+      autocomplete="new-password"
+      hint="6 a 72 caracteres"
+      required
+    />
+
+    <div class="grid grid-cols-2 gap-3">
+      <Field
+        id="firstName"
+        label="Nombres"
+        autocomplete="given-name"
+        required
+      />
+      <Field
+        id="lastName"
+        label="Apellidos"
+        autocomplete="family-name"
+        required
+      />
+    </div>
+
+    <div class="grid grid-cols-[1fr_1.4fr] gap-3">
+      <Select
+        id="documentType"
+        label="Tipo de doc."
+        options={documentOptions}
+        required
+      />
+      <Field
+        id="documentNumber"
+        label="Número"
+        placeholder="Ej. 12345678"
+        required
+      />
+    </div>
+
+    <Field
+      id="phone"
+      label="Teléfono"
+      type="tel"
+      placeholder="+51 987654321"
+      autocomplete="tel"
+    />
+
+    <Field id="birthDate" label="Fecha de nacimiento" type="date" />
+
+    <button
+      type="submit"
+      id="submit-btn"
+      class="block w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:bg-indigo-400"
+    >
+      Crear cuenta
+    </button>
+  </form>
+
+  <p class="mt-6 text-center text-sm text-slate-600">
+    ¿Ya tienes cuenta?
+    <a href="/login" class="font-medium text-indigo-600 hover:text-indigo-700">
+      Inicia sesión
+    </a>
+  </p>
+</AuthLayout>
+
+<script>
+  import { api, auth, ApiError, type RegisterPayload } from "@/lib/api";
+
+  auth.redirectIfAuthenticated();
+
+  const form = document.getElementById("register-form") as HTMLFormElement;
+  const errorBox = document.getElementById("register-error") as HTMLDivElement;
+  const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+
+  function showError(messages: string[]) {
+    errorBox.replaceChildren(
+      ...messages.map((m) => {
+        const div = document.createElement("div");
+        div.textContent = m;
+        return div;
+      }),
+    );
+    errorBox.hidden = false;
+    errorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function clearError() {
+    errorBox.hidden = true;
+    errorBox.replaceChildren();
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearError();
+
+    const formData = new FormData(form);
+    const phone = String(formData.get("phone") ?? "").trim();
+    const birthDate = String(formData.get("birthDate") ?? "").trim();
+
+    const payload: RegisterPayload = {
+      email: String(formData.get("email") ?? "").trim(),
+      password: String(formData.get("password") ?? ""),
+      firstName: String(formData.get("firstName") ?? "").trim(),
+      lastName: String(formData.get("lastName") ?? "").trim(),
+      documentType: formData.get("documentType") as RegisterPayload["documentType"],
+      documentNumber: String(formData.get("documentNumber") ?? "").trim(),
+      ...(phone && { phone }),
+      ...(birthDate && { birthDate }),
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creando cuenta…";
+
+    try {
+      const { accessToken } = await api.register(payload);
+      auth.saveToken(accessToken);
+      window.location.href = "/me";
+    } catch (err) {
+      if (err instanceof ApiError) {
+        showError(err.messages);
+      } else {
+        showError(["Error inesperado, intenta de nuevo"]);
+      }
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Crear cuenta";
+    }
+  });
+</script>

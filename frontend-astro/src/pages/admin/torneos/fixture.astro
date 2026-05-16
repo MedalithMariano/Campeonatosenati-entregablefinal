@@ -1,0 +1,649 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Alert from "@/components/Alert.astro";
+---
+
+<Layout title="Admin · Fixture">
+  <main class="mx-auto max-w-6xl px-6 py-10">
+    <a id="back-link" href="/admin/torneos" class="text-sm text-slate-500 hover:text-slate-700">
+      ← Volver a torneos
+    </a>
+
+    <section
+      id="loading"
+      class="mt-8 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section id="content" hidden class="mt-6 space-y-6">
+      <header class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="px-6 py-5">
+          <p class="text-sm font-medium text-indigo-600">Fixture</p>
+          <h1 id="title" class="mt-1 text-xl font-semibold text-slate-900"></h1>
+          <p id="subtitle" class="text-xs text-slate-500"></p>
+        </div>
+      </header>
+
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div>
+            <h2 class="text-base font-semibold text-slate-900">Fases</h2>
+            <p class="text-xs text-slate-500">Crea fases manualmente o usa el generador.</p>
+          </div>
+          <button
+            id="add-phase-btn"
+            type="button"
+            class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            + Fase
+          </button>
+        </div>
+        <div id="phases-empty" hidden class="px-6 py-8 text-center text-sm text-slate-500">
+          No hay fases creadas. Si tu torneo es de Grupos+Eliminatorias, crea primero una fase GROUP_STAGE con sus grupos antes de generar.
+        </div>
+        <ul id="phases-list" class="divide-y divide-slate-100"></ul>
+      </section>
+
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-6 py-4">
+          <h2 class="text-base font-semibold text-slate-900">Generador</h2>
+          <p class="text-xs text-slate-500">
+            Crea automáticamente las jornadas y partidos según el formato del torneo.
+          </p>
+        </div>
+        <div class="space-y-4 px-6 py-5">
+          <Alert id="generator-error" />
+          <Alert id="generator-success" variant="success" />
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              id="generate-btn"
+              type="button"
+              class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+            >
+              Generar fixture
+            </button>
+            <button
+              id="drop-btn"
+              type="button"
+              class="inline-flex items-center rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
+            >
+              Borrar fixture
+            </button>
+            <button
+              id="seed-btn"
+              type="button"
+              hidden
+              class="inline-flex items-center rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Sembrar bracket desde grupos
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-6 py-4">
+          <h2 class="text-base font-semibold text-slate-900">Partidos</h2>
+          <p id="matches-count" class="text-xs text-slate-500"></p>
+        </div>
+        <div id="matches-container"></div>
+      </section>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    auth,
+    ApiError,
+    type Group,
+    type GroupTeam,
+    type Match,
+    type Phase,
+    type Tournament,
+    type TournamentTeam,
+  } from "@/lib/api";
+
+  const PHASE_LABEL: Record<Phase["type"], string> = {
+    LEAGUE: "Liga",
+    GROUP_STAGE: "Fase de grupos",
+    ROUND_OF_16: "Octavos",
+    QUARTERFINAL: "Cuartos",
+    SEMIFINAL: "Semifinales",
+    FINAL: "Final",
+    THIRD_PLACE: "Tercer puesto",
+  };
+
+  const STATUS_LABEL: Record<Match["status"], string> = {
+    SCHEDULED: "Programado",
+    LIVE: "En vivo",
+    FINISHED: "Finalizado",
+    POSTPONED: "Postergado",
+    CANCELLED: "Cancelado",
+  };
+
+  const token = auth.requireAdmin();
+  const params = new URLSearchParams(window.location.search);
+  const tournamentId = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+
+  if (!token || !tournamentId) {
+    if (!tournamentId) loading.textContent = "Falta el id del torneo";
+  } else {
+    const backLink = document.getElementById("back-link") as HTMLAnchorElement;
+    backLink.href = `/admin/torneos`;
+
+    const titleEl = document.getElementById("title")!;
+    const subtitleEl = document.getElementById("subtitle")!;
+    const phasesList = document.getElementById("phases-list") as HTMLUListElement;
+    const phasesEmpty = document.getElementById("phases-empty") as HTMLElement;
+    const addPhaseBtn = document.getElementById("add-phase-btn") as HTMLButtonElement;
+    const seedBtn = document.getElementById("seed-btn") as HTMLButtonElement;
+    const generateBtn = document.getElementById("generate-btn") as HTMLButtonElement;
+    const dropBtn = document.getElementById("drop-btn") as HTMLButtonElement;
+    const genError = document.getElementById("generator-error") as HTMLElement;
+    const genSuccess = document.getElementById("generator-success") as HTMLElement;
+    const matchesContainer = document.getElementById("matches-container") as HTMLElement;
+    const matchesCount = document.getElementById("matches-count") as HTMLElement;
+
+    let tournament: Tournament | null = null;
+    let registrations: TournamentTeam[] = [];
+
+    function setMessages(el: HTMLElement, messages: string[]) {
+      el.replaceChildren(
+        ...messages.map((m) => {
+          const d = document.createElement("div");
+          d.textContent = m;
+          return d;
+        }),
+      );
+      el.hidden = false;
+    }
+    function clearMessages(el: HTMLElement) {
+      el.hidden = true;
+      el.replaceChildren();
+    }
+
+    function teamName(teamId: string | null): string {
+      if (!teamId) return "—";
+      const r = registrations.find((reg) => reg.teamId === teamId);
+      return r?.team?.name ?? "?";
+    }
+
+    function fmtScore(m: Match): string {
+      if (m.homeScore == null || m.awayScore == null) return "vs";
+      let s = `${m.homeScore} - ${m.awayScore}`;
+      if (m.homePenalties != null && m.awayPenalties != null) {
+        s += ` (pen. ${m.homePenalties}-${m.awayPenalties})`;
+      }
+      return s;
+    }
+
+    function renderPhase(phase: Phase, groups: Group[], groupTeams: GroupTeam[]): HTMLLIElement {
+      const li = document.createElement("li");
+      li.className = "px-6 py-4 space-y-3";
+
+      const header = document.createElement("div");
+      header.className = "flex items-center justify-between";
+
+      const title = document.createElement("div");
+      const name = document.createElement("p");
+      name.className = "font-medium text-slate-900";
+      name.textContent = `${phase.name}`;
+      const meta = document.createElement("p");
+      meta.className = "text-xs text-slate-500";
+      meta.textContent = `${PHASE_LABEL[phase.type]} · orden ${phase.order} · ${phase.legs === 2 ? "ida y vuelta" : "ida"}`;
+      title.append(name, meta);
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className =
+        "inline-flex items-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50";
+      delBtn.textContent = "Eliminar fase";
+      delBtn.addEventListener("click", async () => {
+        if (
+          !confirm(
+            `¿Eliminar la fase "${phase.name}"? Esto borra sus grupos y partidos.`,
+          )
+        )
+          return;
+        try {
+          await api.deletePhase(token, tournamentId!, phase.id);
+          await refresh();
+        } catch (err) {
+          alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+        }
+      });
+
+      header.append(title, delBtn);
+      li.append(header);
+
+      // Grupos si aplica
+      if (phase.type === "GROUP_STAGE") {
+        const groupsBlock = document.createElement("div");
+        groupsBlock.className = "mt-3 space-y-3";
+
+        const groupsHeader = document.createElement("div");
+        groupsHeader.className = "flex items-center justify-between";
+        const gh = document.createElement("p");
+        gh.className = "text-xs font-medium text-slate-600";
+        gh.textContent = "Grupos";
+        const addGroupBtn = document.createElement("button");
+        addGroupBtn.type = "button";
+        addGroupBtn.className =
+          "inline-flex items-center rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50";
+        addGroupBtn.textContent = "+ Grupo";
+        addGroupBtn.addEventListener("click", async () => {
+          const name = prompt('Nombre del grupo (ej. "A"):', "");
+          if (!name) return;
+          try {
+            await api.createGroup(token, phase.id, {
+              name: name.trim(),
+              capacity: 4,
+            });
+            await refresh();
+          } catch (err) {
+            alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+          }
+        });
+        groupsHeader.append(gh, addGroupBtn);
+        groupsBlock.append(groupsHeader);
+
+        const phaseGroups = groups.filter((g) => g.phaseId === phase.id);
+        for (const group of phaseGroups) {
+          const card = document.createElement("div");
+          card.className = "rounded-lg border border-slate-200 bg-slate-50 p-3";
+
+          const cardHeader = document.createElement("div");
+          cardHeader.className = "flex items-center justify-between";
+          const gName = document.createElement("p");
+          gName.className = "font-medium text-slate-900";
+          gName.textContent = `Grupo ${group.name} (capacidad ${group.capacity})`;
+          const delGroupBtn = document.createElement("button");
+          delGroupBtn.type = "button";
+          delGroupBtn.className =
+            "text-xs font-medium text-rose-600 hover:underline";
+          delGroupBtn.textContent = "Eliminar";
+          delGroupBtn.addEventListener("click", async () => {
+            if (!confirm(`¿Eliminar el grupo ${group.name}?`)) return;
+            try {
+              await api.deleteGroup(token, phase.id, group.id);
+              await refresh();
+            } catch (err) {
+              alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+            }
+          });
+          cardHeader.append(gName, delGroupBtn);
+          card.append(cardHeader);
+
+          // Equipos asignados al grupo
+          const teamsInGroup = groupTeams.filter((gt) => gt.groupId === group.id);
+          const ul = document.createElement("ul");
+          ul.className = "mt-2 space-y-1";
+          for (const gt of teamsInGroup) {
+            const teamLi = document.createElement("li");
+            teamLi.className =
+              "flex items-center justify-between rounded bg-white px-2 py-1 text-xs";
+            const nameSpan = document.createElement("span");
+            nameSpan.textContent = gt.team?.name ?? gt.teamId;
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.className = "text-rose-600 hover:underline";
+            removeBtn.textContent = "Quitar";
+            removeBtn.addEventListener("click", async () => {
+              try {
+                await api.unassignTeamFromGroup(
+                  token,
+                  phase.id,
+                  group.id,
+                  gt.teamId,
+                );
+                await refresh();
+              } catch (err) {
+                alert(
+                  err instanceof ApiError ? err.messages.join(" · ") : "Error",
+                );
+              }
+            });
+            teamLi.append(nameSpan, removeBtn);
+            ul.append(teamLi);
+          }
+          card.append(ul);
+
+          // Select para asignar más equipos
+          const assignedTeamIdsInPhase = new Set(
+            groupTeams
+              .filter((gt) => {
+                const grp = phaseGroups.find((g) => g.id === gt.groupId);
+                return grp != null;
+              })
+              .map((gt) => gt.teamId),
+          );
+          const available = registrations.filter(
+            (r) => !assignedTeamIdsInPhase.has(r.teamId),
+          );
+          if (available.length > 0 && teamsInGroup.length < group.capacity) {
+            const assignRow = document.createElement("div");
+            assignRow.className = "mt-2 flex items-center gap-2";
+            const select = document.createElement("select");
+            select.className =
+              "block w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs";
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "— asignar equipo —";
+            select.append(placeholder);
+            for (const r of available) {
+              const o = document.createElement("option");
+              o.value = r.teamId;
+              o.textContent = r.team?.name ?? r.teamId;
+              select.append(o);
+            }
+            const goBtn = document.createElement("button");
+            goBtn.type = "button";
+            goBtn.className =
+              "inline-flex items-center rounded bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700";
+            goBtn.textContent = "Asignar";
+            goBtn.addEventListener("click", async () => {
+              if (!select.value) return;
+              try {
+                await api.assignTeamToGroup(
+                  token,
+                  phase.id,
+                  group.id,
+                  select.value,
+                );
+                await refresh();
+              } catch (err) {
+                alert(
+                  err instanceof ApiError ? err.messages.join(" · ") : "Error",
+                );
+              }
+            });
+            assignRow.append(select, goBtn);
+            card.append(assignRow);
+          }
+
+          groupsBlock.append(card);
+        }
+
+        li.append(groupsBlock);
+      }
+
+      return li;
+    }
+
+    function renderMatchRow(m: Match): HTMLLIElement {
+      const li = document.createElement("li");
+      li.className = "grid grid-cols-[1fr_auto_auto] items-center gap-3 px-5 py-3";
+
+      const teamsCol = document.createElement("div");
+      teamsCol.className = "min-w-0";
+      const teams = document.createElement("p");
+      teams.className = "truncate font-medium text-slate-900";
+      teams.textContent = `${teamName(m.homeTeamId)} vs ${teamName(m.awayTeamId)}`;
+      const meta = document.createElement("p");
+      meta.className = "text-xs text-slate-500";
+      const parts: string[] = [];
+      if (m.matchDay) parts.push(`Jornada ${m.matchDay.number}`);
+      if (m.bracketRound != null) parts.push(`Ronda ${m.bracketRound}`);
+      parts.push(STATUS_LABEL[m.status]);
+      meta.textContent = parts.join(" · ");
+      teamsCol.append(teams, meta);
+
+      const scoreCol = document.createElement("div");
+      scoreCol.className = "font-mono text-sm text-slate-700";
+      scoreCol.textContent = fmtScore(m);
+
+      const detailLink = document.createElement("a");
+      detailLink.href = `/admin/partidos/ver?id=${encodeURIComponent(m.id)}`;
+      detailLink.className =
+        "inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
+      detailLink.textContent = "Detalle";
+
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className =
+        "inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
+      editBtn.textContent = "Resultado";
+      editBtn.addEventListener("click", () => openMatchEditor(m));
+
+      const actions = document.createElement("div");
+      actions.className = "flex items-center gap-2";
+      actions.append(detailLink, editBtn);
+
+      li.className = "grid grid-cols-[1fr_auto_auto] items-center gap-3 px-5 py-3";
+      li.append(teamsCol, scoreCol, actions);
+      return li;
+    }
+
+    async function openMatchEditor(m: Match) {
+      const homeName = teamName(m.homeTeamId);
+      const awayName = teamName(m.awayTeamId);
+      const homeScore = prompt(
+        `Goles ${homeName}:`,
+        m.homeScore?.toString() ?? "",
+      );
+      if (homeScore === null) return;
+      const awayScore = prompt(
+        `Goles ${awayName}:`,
+        m.awayScore?.toString() ?? "",
+      );
+      if (awayScore === null) return;
+      const finish = confirm("¿Marcar partido como FINALIZADO?");
+
+      const payload: import("@/lib/api").UpdateMatchPayload = {};
+      const hs = homeScore.trim() === "" ? null : Number(homeScore);
+      const as = awayScore.trim() === "" ? null : Number(awayScore);
+      payload.homeScore = hs;
+      payload.awayScore = as;
+
+      // Penales para KO empatado
+      if (finish && m.bracketRound != null && hs != null && as != null && hs === as) {
+        const hp = prompt(`Penales ${homeName}:`, m.homePenalties?.toString() ?? "");
+        if (hp === null) return;
+        const ap = prompt(`Penales ${awayName}:`, m.awayPenalties?.toString() ?? "");
+        if (ap === null) return;
+        payload.homePenalties = hp.trim() === "" ? null : Number(hp);
+        payload.awayPenalties = ap.trim() === "" ? null : Number(ap);
+      }
+
+      if (finish) payload.status = "FINISHED";
+
+      try {
+        await api.updateMatch(token!, m.id, payload);
+        await refresh();
+      } catch (err) {
+        alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+      }
+    }
+
+    async function refresh() {
+      const [phases, matches] = await Promise.all([
+        api.listPhases(tournamentId!),
+        api.listMatches(tournamentId!),
+      ]);
+
+      // Cargar grupos y group_teams de todas las phases GROUP_STAGE
+      const groupPhases = phases.filter((p) => p.type === "GROUP_STAGE");
+      const groupsByPhase = await Promise.all(
+        groupPhases.map((p) => api.listGroups(p.id)),
+      );
+      const allGroups = groupsByPhase.flat();
+      const groupTeamsByGroup = await Promise.all(
+        allGroups.map((g) =>
+          api.listGroupTeams(g.phaseId, g.id).then((ts) =>
+            ts.map((t) => ({ ...t, groupId: g.id })),
+          ),
+        ),
+      );
+      const allGroupTeams = groupTeamsByGroup.flat();
+
+      // Render phases
+      if (phases.length === 0) {
+        phasesEmpty.hidden = false;
+        phasesList.replaceChildren();
+      } else {
+        phasesEmpty.hidden = true;
+        phasesList.replaceChildren(
+          ...phases.map((p) => renderPhase(p, allGroups, allGroupTeams)),
+        );
+      }
+
+      // Render matches
+      matchesCount.textContent = `${matches.length} partido${matches.length === 1 ? "" : "s"}`;
+      if (matches.length === 0) {
+        matchesContainer.innerHTML = "";
+        const empty = document.createElement("p");
+        empty.className = "px-6 py-8 text-center text-sm text-slate-500";
+        empty.textContent =
+          "Aún no hay partidos. Genera el fixture o créalos manualmente.";
+        matchesContainer.append(empty);
+      } else {
+        const byPhase = new Map<string, Match[]>();
+        for (const m of matches) {
+          const list = byPhase.get(m.phaseId) ?? [];
+          list.push(m);
+          byPhase.set(m.phaseId, list);
+        }
+        matchesContainer.innerHTML = "";
+        for (const phase of phases) {
+          const list = byPhase.get(phase.id);
+          if (!list || list.length === 0) continue;
+          const section = document.createElement("section");
+          section.className = "border-b border-slate-100 last:border-0";
+          const h = document.createElement("h3");
+          h.className =
+            "border-b border-slate-100 bg-slate-50 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500";
+          h.textContent = `${PHASE_LABEL[phase.type]} · ${phase.name}`;
+          const ul = document.createElement("ul");
+          ul.className = "divide-y divide-slate-100";
+          ul.replaceChildren(...list.map(renderMatchRow));
+          section.append(h, ul);
+          matchesContainer.append(section);
+        }
+      }
+    }
+
+    addPhaseBtn.addEventListener("click", async () => {
+      const name = prompt('Nombre de la fase (ej. "Fase de grupos"):', "");
+      if (!name) return;
+      const type = prompt(
+        "Tipo (LEAGUE / GROUP_STAGE / ROUND_OF_16 / QUARTERFINAL / SEMIFINAL / FINAL / THIRD_PLACE):",
+        "GROUP_STAGE",
+      );
+      if (!type) return;
+      const orderStr = prompt("Orden secuencial (1, 2, …):", "1");
+      if (!orderStr) return;
+      const order = Number(orderStr);
+      if (!Number.isInteger(order) || order < 1) {
+        alert("Orden inválido");
+        return;
+      }
+      try {
+        await api.createPhase(token, tournamentId!, {
+          name: name.trim(),
+          type: type.trim() as Phase["type"],
+          order,
+          legs: 1,
+        });
+        await refresh();
+      } catch (err) {
+        alert(err instanceof ApiError ? err.messages.join(" · ") : "Error");
+      }
+    });
+
+    generateBtn.addEventListener("click", async () => {
+      clearMessages(genError);
+      clearMessages(genSuccess);
+      generateBtn.disabled = true;
+      generateBtn.textContent = "Generando…";
+      try {
+        const result = await api.generateFixture(token, tournamentId!);
+        setMessages(genSuccess, [
+          `Fixture generado: ${result.phasesCreated} fases y ${result.matchesCreated} partidos.`,
+        ]);
+        await refresh();
+      } catch (err) {
+        setMessages(
+          genError,
+          err instanceof ApiError ? err.messages : ["Error inesperado"],
+        );
+      } finally {
+        generateBtn.disabled = false;
+        generateBtn.textContent = "Generar fixture";
+      }
+    });
+
+    dropBtn.addEventListener("click", async () => {
+      if (
+        !confirm(
+          "¿Borrar todas las fases, grupos y partidos del torneo? Esto NO se puede deshacer.",
+        )
+      )
+        return;
+      clearMessages(genError);
+      clearMessages(genSuccess);
+      try {
+        await api.dropFixture(token, tournamentId!);
+        setMessages(genSuccess, ["Fixture borrado."]);
+        await refresh();
+      } catch (err) {
+        setMessages(
+          genError,
+          err instanceof ApiError ? err.messages : ["Error inesperado"],
+        );
+      }
+    });
+
+    try {
+      tournament = await api.getTournament(tournamentId);
+      registrations = await api.listRegistrations(tournamentId);
+
+      titleEl.textContent = tournament.name;
+      subtitleEl.textContent = `${tournament.season} · ${tournament.format} · ${registrations.length} equipos inscritos`;
+
+      if (tournament.format === "GROUPS_KNOCKOUT") {
+        seedBtn.hidden = false;
+        seedBtn.addEventListener("click", async () => {
+          if (
+            !confirm(
+              "¿Sembrar el bracket con los clasificados de la fase de grupos? Requiere que todos los partidos de grupos estén FINALIZADOS.",
+            )
+          )
+            return;
+          clearMessages(genError);
+          clearMessages(genSuccess);
+          seedBtn.disabled = true;
+          seedBtn.textContent = "Sembrando…";
+          try {
+            const result = await api.seedKnockout(token, tournamentId!);
+            setMessages(genSuccess, [
+              `Bracket sembrado: ${result.matchesUpdated} llave(s) actualizada(s).`,
+            ]);
+            await refresh();
+          } catch (err) {
+            setMessages(
+              genError,
+              err instanceof ApiError ? err.messages : ["Error inesperado"],
+            );
+          } finally {
+            seedBtn.disabled = false;
+            seedBtn.textContent = "Sembrar bracket desde grupos";
+          }
+        });
+      }
+
+      await refresh();
+
+      loading.hidden = true;
+      content.hidden = false;
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error";
+    }
+  }
+</script>

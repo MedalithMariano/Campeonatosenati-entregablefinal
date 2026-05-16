@@ -1,0 +1,250 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Field from "@/components/Field.astro";
+import Select from "@/components/Select.astro";
+import Alert from "@/components/Alert.astro";
+---
+
+<Layout title="Admin · Editar jugador">
+  <main class="mx-auto max-w-3xl px-6 py-10">
+    <a
+      href="/admin/jugadores"
+      class="text-sm text-slate-500 hover:text-slate-700"
+    >← Volver a jugadores</a>
+
+    <section
+      id="loading"
+      class="mt-8 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section
+      id="content"
+      hidden
+      class="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-100 px-6 py-4">
+        <h1 class="text-base font-semibold text-slate-900">Editar jugador</h1>
+      </div>
+      <form id="edit-form" class="space-y-5 px-6 py-5" novalidate>
+        <Alert id="edit-error" />
+        <Alert id="edit-success" variant="success" />
+
+        <div class="flex items-center gap-4">
+          <div
+            id="current-photo"
+            class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-base font-semibold text-slate-500"
+          >
+          </div>
+          <div class="text-xs text-slate-500">Foto actual</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="firstName" label="Nombres" required />
+          <Field id="lastName" label="Apellidos" required />
+        </div>
+
+        <div class="grid grid-cols-[1fr_1.4fr] gap-3">
+          <Select
+            id="documentType"
+            label="Tipo de doc."
+            options={[
+              { value: "DNI", label: "DNI" },
+              { value: "CE", label: "Carnet de extranjería" },
+              { value: "PASAPORTE", label: "Pasaporte" },
+              { value: "RUC", label: "RUC" },
+            ]}
+            required
+          />
+          <Field id="documentNumber" label="Número" required />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <Field id="birthDate" label="Fecha de nacimiento" type="date" required />
+          <Select
+            id="position"
+            label="Posición"
+            options={[
+              { value: "GK", label: "Portero" },
+              { value: "DEF", label: "Defensa" },
+              { value: "MID", label: "Centrocampista" },
+              { value: "FWD", label: "Delantero" },
+            ]}
+            required
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <Select
+            id="preferredFoot"
+            label="Pie hábil"
+            options={[
+              { value: "", label: "—" },
+              { value: "RIGHT", label: "Derecho" },
+              { value: "LEFT", label: "Izquierdo" },
+              { value: "BOTH", label: "Ambidiestro" },
+            ]}
+          />
+          <Field id="nationality" label="Nacionalidad" />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="photo" class="block text-sm font-medium text-slate-700">
+            Reemplazar foto <span class="text-slate-400 font-normal">· opcional</span>
+          </label>
+          <input
+            id="photo"
+            name="photo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-slate-700"
+          />
+        </div>
+
+        <div class="flex items-center justify-end gap-2">
+          <button
+            type="submit"
+            id="save-btn"
+            class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+          >
+            Guardar cambios
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import {
+    api,
+    auth,
+    ApiError,
+    cloudinaryUrl,
+    type UpdatePlayerPayload,
+  } from "@/lib/api";
+
+  const token = auth.requireAdmin();
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+
+  if (token && id) {
+    const form = document.getElementById("edit-form") as HTMLFormElement;
+    const errorBox = document.getElementById("edit-error") as HTMLElement;
+    const successBox = document.getElementById("edit-success") as HTMLElement;
+    const saveBtn = document.getElementById("save-btn") as HTMLButtonElement;
+    const currentPhoto = document.getElementById("current-photo") as HTMLElement;
+
+    function setMessages(el: HTMLElement, messages: string[]) {
+      el.replaceChildren(
+        ...messages.map((m) => {
+          const d = document.createElement("div");
+          d.textContent = m;
+          return d;
+        }),
+      );
+      el.hidden = false;
+    }
+    function clearMessages(el: HTMLElement) {
+      el.hidden = true;
+      el.replaceChildren();
+    }
+
+    function paintPhoto(url: string | null, alt: string) {
+      const src = cloudinaryUrl(url, "w_128,h_128,c_fill,g_face,q_auto,f_auto");
+      if (src) {
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = alt;
+        img.className = "h-full w-full object-cover";
+        currentPhoto.replaceChildren(img);
+      } else {
+        currentPhoto.textContent = alt
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((p) => p[0]?.toUpperCase() ?? "")
+          .join("");
+      }
+    }
+
+    try {
+      const p = await api.getPlayer(id);
+
+      (form.elements.namedItem("firstName") as HTMLInputElement).value = p.firstName;
+      (form.elements.namedItem("lastName") as HTMLInputElement).value = p.lastName;
+      (form.elements.namedItem("documentType") as HTMLSelectElement).value =
+        p.documentType;
+      (form.elements.namedItem("documentNumber") as HTMLInputElement).value =
+        p.documentNumber;
+      (form.elements.namedItem("birthDate") as HTMLInputElement).value = p.birthDate;
+      (form.elements.namedItem("position") as HTMLSelectElement).value = p.position;
+      (form.elements.namedItem("preferredFoot") as HTMLSelectElement).value =
+        p.preferredFoot ?? "";
+      (form.elements.namedItem("nationality") as HTMLInputElement).value =
+        p.nationality ?? "";
+
+      paintPhoto(p.photoUrl, `${p.firstName} ${p.lastName}`);
+
+      loading.hidden = true;
+      content.hidden = false;
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearMessages(errorBox);
+        clearMessages(successBox);
+
+        const fd = new FormData(form);
+        const file = (fd.get("photo") as File | null) ?? null;
+        const preferredFoot = String(fd.get("preferredFoot") ?? "").trim();
+        const nationality = String(fd.get("nationality") ?? "").trim();
+
+        const payload: UpdatePlayerPayload = {
+          firstName: String(fd.get("firstName") ?? "").trim(),
+          lastName: String(fd.get("lastName") ?? "").trim(),
+          documentType: fd.get("documentType") as UpdatePlayerPayload["documentType"],
+          documentNumber: String(fd.get("documentNumber") ?? "").trim(),
+          birthDate: String(fd.get("birthDate") ?? ""),
+          position: fd.get("position") as UpdatePlayerPayload["position"],
+          preferredFoot: preferredFoot
+            ? (preferredFoot as UpdatePlayerPayload["preferredFoot"])
+            : undefined,
+          nationality: nationality || undefined,
+        };
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Guardando…";
+
+        try {
+          if (file && file.size > 0) {
+            saveBtn.textContent = "Subiendo foto…";
+            const upload = await api.uploadImage(token, file, "players");
+            payload.photoUrl = upload.url;
+            payload.photoPublicId = upload.publicId;
+          }
+          saveBtn.textContent = "Guardando…";
+          const updated = await api.updatePlayer(token, id, payload);
+          paintPhoto(updated.photoUrl, `${updated.firstName} ${updated.lastName}`);
+          (form.elements.namedItem("photo") as HTMLInputElement).value = "";
+          setMessages(successBox, ["Jugador actualizado"]);
+        } catch (err) {
+          setMessages(
+            errorBox,
+            err instanceof ApiError ? err.messages : ["Error inesperado"],
+          );
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Guardar cambios";
+        }
+      });
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error";
+    }
+  } else if (!id) {
+    loading.textContent = "Falta el id del jugador";
+  }
+</script>

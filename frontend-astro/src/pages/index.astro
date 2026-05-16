@@ -1,0 +1,46 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { Rocket, LogIn, UserPlus } from "@lucide/astro";
+---
+
+<Layout title="Frontend Astro">
+  <main class="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-6 py-16">
+    <div class="flex items-center gap-3">
+      <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200">
+        <Rocket size={24} />
+      </span>
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-slate-900">
+          Frontend Astro
+        </h1>
+        <p class="text-sm text-slate-500">Conectado al backend NestJS</p>
+      </div>
+    </div>
+
+    <p class="mt-10 text-lg text-slate-600">
+      Demo de autenticación con JWT, perfiles de usuario y PostgreSQL.
+    </p>
+
+    <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+      <a
+        href="/login"
+        class="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200"
+      >
+        <LogIn size={16} />
+        Iniciar sesión
+      </a>
+      <a
+        href="/register"
+        class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-xs transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100"
+      >
+        <UserPlus size={16} />
+        Crear cuenta
+      </a>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { auth } from "@/lib/api";
+  auth.redirectIfAuthenticated();
+</script>

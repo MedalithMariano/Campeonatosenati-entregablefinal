@@ -1,0 +1,104 @@
+---
+import AuthLayout from "@/layouts/AuthLayout.astro";
+import Field from "@/components/Field.astro";
+import Alert from "@/components/Alert.astro";
+---
+
+<AuthLayout
+  title="Iniciar sesión"
+  subtitle="Ingresa tus credenciales para continuar"
+>
+  <form id="login-form" class="space-y-5" novalidate>
+    <Alert id="login-error" />
+
+    <Field
+      id="email"
+      label="Correo electrónico"
+      type="email"
+      placeholder="tu@correo.com"
+      autocomplete="email"
+      required
+    />
+
+    <Field
+      id="password"
+      label="Contraseña"
+      type="password"
+      placeholder="••••••••"
+      autocomplete="current-password"
+      required
+    />
+
+    <button
+      type="submit"
+      id="submit-btn"
+      class="block w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:bg-indigo-400"
+    >
+      Entrar
+    </button>
+  </form>
+
+  <p class="mt-6 text-center text-sm text-slate-600">
+    ¿No tienes cuenta?
+    <a
+      href="/register"
+      class="font-medium text-indigo-600 hover:text-indigo-700"
+    >
+      Crea una
+    </a>
+  </p>
+</AuthLayout>
+
+<script>
+  import { api, auth, ApiError } from "@/lib/api";
+
+  auth.redirectIfAuthenticated();
+
+  const form = document.getElementById("login-form") as HTMLFormElement;
+  const errorBox = document.getElementById("login-error") as HTMLDivElement;
+  const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+
+  function showError(messages: string[]) {
+    errorBox.replaceChildren(
+      ...messages.map((m) => {
+        const div = document.createElement("div");
+        div.textContent = m;
+        return div;
+      }),
+    );
+    errorBox.hidden = false;
+  }
+
+  function clearError() {
+    errorBox.hidden = true;
+    errorBox.replaceChildren();
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearError();
+
+    const formData = new FormData(form);
+    const payload = {
+      email: String(formData.get("email") ?? "").trim(),
+      password: String(formData.get("password") ?? ""),
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Entrando…";
+
+    try {
+      const { accessToken } = await api.login(payload);
+      auth.saveToken(accessToken);
+      window.location.href = "/me";
+    } catch (err) {
+      if (err instanceof ApiError) {
+        showError(err.messages);
+      } else {
+        showError(["Error inesperado, intenta de nuevo"]);
+      }
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Entrar";
+    }
+  });
+</script>

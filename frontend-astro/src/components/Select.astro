@@ -1,0 +1,32 @@
+---
+interface Option {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  id: string;
+  label: string;
+  options: Option[];
+  required?: boolean;
+  hint?: string;
+}
+
+const { id, label, options, required = false, hint } = Astro.props;
+---
+
+<div class="space-y-1.5">
+  <label for={id} class="block text-sm font-medium text-slate-700">
+    {label}
+    {!required && <span class="text-slate-400 font-normal">· opcional</span>}
+  </label>
+  <select
+    id={id}
+    name={id}
+    required={required}
+    class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+  >
+    {options.map((opt) => <option value={opt.value}>{opt.label}</option>)}
+  </select>
+  {hint && <p class="text-xs text-slate-500">{hint}</p>}
+</div>

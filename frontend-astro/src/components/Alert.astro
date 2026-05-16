@@ -1,0 +1,23 @@
+---
+interface Props {
+  id?: string;
+  variant?: "error" | "success";
+  hidden?: boolean;
+}
+
+const { id, variant = "error", hidden = true } = Astro.props;
+
+const variants = {
+  error: "bg-rose-50 border-rose-200 text-rose-800",
+  success: "bg-emerald-50 border-emerald-200 text-emerald-800",
+};
+---
+
+<div
+  id={id}
+  role="alert"
+  hidden={hidden}
+  class={`rounded-lg border px-4 py-3 text-sm ${variants[variant]}`}
+>
+  <slot />
+</div>

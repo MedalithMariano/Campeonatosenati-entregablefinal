@@ -1,0 +1,427 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Registrar Resultado">
+  <main class="mx-auto max-w-3xl px-6 py-10">
+    <a id="back-link" href="/torneos" class="text-sm text-slate-500 hover:text-slate-700">
+      ← Volver al partido
+    </a>
+
+    <section
+      id="loading"
+      class="mt-6 rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
+    >
+      Cargando…
+    </section>
+
+    <section id="content" hidden class="mt-6 space-y-6">
+
+      <!-- Header del partido -->
+      <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-6 py-3">
+          <p id="phase-meta" class="text-xs uppercase tracking-wide text-slate-500"></p>
+        </div>
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-5">
+          <p id="home-name" class="text-right text-base font-semibold text-slate-900"></p>
+          <p id="score-display" class="font-mono text-3xl font-bold text-slate-900 text-center">— : —</p>
+          <p id="away-name" class="text-base font-semibold text-slate-900"></p>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="error-box" hidden class="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600"></div>
+      <div id="success-box" hidden class="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700"></div>
+
+      <!-- 1. Marcador y estado -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+        <h2 class="text-base font-semibold text-slate-900">1. Marcador y estado</h2>
+
+        <div class="grid grid-cols-3 items-center gap-4">
+          <div>
+            <label id="home-score-label" for="home-score" class="block text-xs font-medium text-slate-500 mb-1">Local</label>
+            <input id="home-score" type="number" min="0" value="0"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-center text-2xl font-mono font-bold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <div class="text-center text-slate-400 text-2xl font-bold">—</div>
+          <div>
+            <label id="away-score-label" for="away-score" class="block text-xs font-medium text-slate-500 mb-1">Visitante</label>
+            <input id="away-score" type="number" min="0" value="0"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-center text-2xl font-mono font-bold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+        </div>
+
+        <!-- Penales (opcional) -->
+        <div id="penalties-section">
+          <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+            <input id="has-penalties" type="checkbox" class="rounded" />
+            ¿Hubo definición por penales?
+          </label>
+          <div id="penalties-inputs" hidden class="mt-3 grid grid-cols-3 items-center gap-4">
+            <input id="home-pen" type="number" min="0" value="0"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-center font-mono outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" placeholder="Pen. local" />
+            <div class="text-center text-slate-400 text-sm">penales</div>
+            <input id="away-pen" type="number" min="0" value="0"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-center font-mono outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" placeholder="Pen. visit." />
+          </div>
+        </div>
+
+        <div>
+          <label for="match-status" class="block text-xs font-medium text-slate-500 mb-1">Estado del partido</label>
+          <select id="match-status"
+            class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+            <option value="SCHEDULED">Programado</option>
+            <option value="LIVE">En vivo</option>
+            <option value="FINISHED" selected>Finalizado</option>
+            <option value="POSTPONED">Postergado</option>
+            <option value="CANCELLED">Cancelado</option>
+          </select>
+        </div>
+
+        <button id="save-score-btn"
+          class="w-full rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">
+          Guardar marcador
+        </button>
+      </div>
+
+      <!-- 2. Registrar eventos -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+        <h2 class="text-base font-semibold text-slate-900">2. Registrar evento</h2>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="event-team" class="block text-xs font-medium text-slate-500 mb-1">Equipo</label>
+            <select id="event-team"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+              <option value="">— Seleccionar —</option>
+            </select>
+          </div>
+          <div>
+            <label for="event-type" class="block text-xs font-medium text-slate-500 mb-1">Tipo de evento</label>
+            <select id="event-type"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+              <option value="GOAL">⚽ Gol</option>
+              <option value="OWN_GOAL">🥅 Autogol</option>
+              <option value="PENALTY_GOAL">🎯 Gol de penal</option>
+              <option value="MISSED_PENALTY">❌ Penal fallado</option>
+              <option value="YELLOW_CARD">🟨 Tarjeta amarilla</option>
+              <option value="RED_CARD">🟥 Tarjeta roja</option>
+              <option value="SECOND_YELLOW">🟨🟥 Doble amarilla</option>
+              <option value="SUBSTITUTION">🔄 Cambio</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="event-player" class="block text-xs font-medium text-slate-500 mb-1">Jugador</label>
+            <select id="event-player"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+              <option value="">— Seleccionar equipo primero —</option>
+            </select>
+          </div>
+          <div id="related-player-wrap">
+            <label for="event-related-player" class="block text-xs font-medium text-slate-500 mb-1">
+              Asistencia / Sale (opcional)
+            </label>
+            <select id="event-related-player"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+              <option value="">— Ninguno —</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="event-minute" class="block text-xs font-medium text-slate-500 mb-1">Minuto <span class="text-red-500">*</span></label>
+            <input id="event-minute" type="number" min="1" max="120" placeholder="Ej: 45"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <div>
+            <label for="event-added" class="block text-xs font-medium text-slate-500 mb-1">Tiempo añadido</label>
+            <input id="event-added" type="number" min="1" max="20" placeholder="Ej: 3"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+        </div>
+
+        <button id="add-event-btn"
+          class="w-full rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60">
+          + Agregar evento
+        </button>
+      </div>
+
+      <!-- 3. Eventos registrados -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-base font-semibold text-slate-900 mb-4">3. Eventos del partido</h2>
+        <ul id="events-list" class="space-y-2">
+          <li id="events-empty" class="text-center text-sm text-slate-500">Sin eventos registrados.</li>
+        </ul>
+      </div>
+
+    </section>
+  </main>
+</Layout>
+
+<script>
+  import { api, ApiError, auth, type Match, type MatchEvent, type RosterEntry } from "@/lib/api";
+
+  const token = auth.requireAdmin();
+  if (!token) throw new Error("No autorizado");
+
+  const params = new URLSearchParams(window.location.search);
+  const matchId = params.get("id");
+
+  const loading = document.getElementById("loading") as HTMLElement;
+  const content = document.getElementById("content") as HTMLElement;
+  const errorBox = document.getElementById("error-box") as HTMLElement;
+  const successBox = document.getElementById("success-box") as HTMLElement;
+  const backLink = document.getElementById("back-link") as HTMLAnchorElement;
+
+  const EVENT_ICON: Record<MatchEvent["type"], string> = {
+    GOAL: "⚽", OWN_GOAL: "🥅", PENALTY_GOAL: "🎯", MISSED_PENALTY: "❌",
+    YELLOW_CARD: "🟨", RED_CARD: "🟥", SECOND_YELLOW: "🟨🟥", SUBSTITUTION: "🔄",
+  };
+  const EVENT_LABEL: Record<MatchEvent["type"], string> = {
+    GOAL: "Gol", OWN_GOAL: "Autogol", PENALTY_GOAL: "Gol de penal",
+    MISSED_PENALTY: "Penal fallado", YELLOW_CARD: "Tarjeta amarilla",
+    RED_CARD: "Tarjeta roja", SECOND_YELLOW: "Doble amarilla", SUBSTITUTION: "Cambio",
+  };
+  const PHASE_LABEL: Record<NonNullable<Match["phase"]>["type"], string> = {
+    LEAGUE: "Liga", GROUP_STAGE: "Fase de grupos", ROUND_OF_16: "Octavos",
+    QUARTERFINAL: "Cuartos", SEMIFINAL: "Semifinales", FINAL: "Final", THIRD_PLACE: "Tercer puesto",
+  };
+
+  function showError(msg: string) {
+    errorBox.textContent = msg;
+    errorBox.hidden = false;
+    successBox.hidden = true;
+    setTimeout(() => errorBox.hidden = true, 4000);
+  }
+
+  function showSuccess(msg: string) {
+    successBox.textContent = msg;
+    successBox.hidden = false;
+    errorBox.hidden = true;
+    setTimeout(() => successBox.hidden = true, 3000);
+  }
+
+  if (!matchId) {
+    loading.textContent = "Falta el id del partido";
+  } else {
+    try {
+      const match = await api.getMatch(matchId);
+      backLink.href = `/partidos/ver?id=${encodeURIComponent(matchId)}`;
+
+      // Header
+      document.getElementById("home-name")!.textContent = match.homeTeam?.name ?? "Local";
+      document.getElementById("away-name")!.textContent = match.awayTeam?.name ?? "Visitante";
+      document.getElementById("home-score-label")!.textContent = match.homeTeam?.name ?? "Local";
+      document.getElementById("away-score-label")!.textContent = match.awayTeam?.name ?? "Visitante";
+      const phaseMeta = match.phase ? `${PHASE_LABEL[match.phase.type]} · ${match.phase.name}` : "Partido";
+      document.getElementById("phase-meta")!.textContent = phaseMeta;
+
+      // Marcador actual
+      const homeScoreInput = document.getElementById("home-score") as HTMLInputElement;
+      const awayScoreInput = document.getElementById("away-score") as HTMLInputElement;
+      const scoreDisplay = document.getElementById("score-display") as HTMLElement;
+      const statusSelect = document.getElementById("match-status") as HTMLSelectElement;
+
+      if (match.homeScore != null) homeScoreInput.value = String(match.homeScore);
+      if (match.awayScore != null) awayScoreInput.value = String(match.awayScore);
+      statusSelect.value = match.status;
+
+      function updateScoreDisplay() {
+        scoreDisplay.textContent = `${homeScoreInput.value} : ${awayScoreInput.value}`;
+      }
+      homeScoreInput.addEventListener("input", updateScoreDisplay);
+      awayScoreInput.addEventListener("input", updateScoreDisplay);
+      updateScoreDisplay();
+
+      // Penales
+      const hasPenalties = document.getElementById("has-penalties") as HTMLInputElement;
+      const penaltiesInputs = document.getElementById("penalties-inputs") as HTMLElement;
+      const homePen = document.getElementById("home-pen") as HTMLInputElement;
+      const awayPen = document.getElementById("away-pen") as HTMLInputElement;
+      if (match.homePenalties != null) {
+        hasPenalties.checked = true;
+        penaltiesInputs.hidden = false;
+        homePen.value = String(match.homePenalties);
+        awayPen.value = String(match.awayPenalties);
+      }
+      hasPenalties.addEventListener("change", () => {
+        penaltiesInputs.hidden = !hasPenalties.checked;
+      });
+
+      // Guardar marcador
+      const saveScoreBtn = document.getElementById("save-score-btn") as HTMLButtonElement;
+      saveScoreBtn.addEventListener("click", async () => {
+        saveScoreBtn.disabled = true;
+        saveScoreBtn.textContent = "Guardando…";
+        try {
+          await api.updateMatch(token!, matchId, {
+            homeScore: parseInt(homeScoreInput.value) || 0,
+            awayScore: parseInt(awayScoreInput.value) || 0,
+            status: statusSelect.value as any,
+            homePenalties: hasPenalties.checked ? parseInt(homePen.value) || 0 : null,
+            awayPenalties: hasPenalties.checked ? parseInt(awayPen.value) || 0 : null,
+          });
+          showSuccess("✓ Marcador guardado");
+        } catch (err) {
+          showError(err instanceof ApiError ? err.messages.join(" · ") : "Error al guardar");
+        } finally {
+          saveScoreBtn.disabled = false;
+          saveScoreBtn.textContent = "Guardar marcador";
+        }
+      });
+
+      // Cargar rosters para eventos
+      const eventTeamSelect = document.getElementById("event-team") as HTMLSelectElement;
+      const eventPlayerSelect = document.getElementById("event-player") as HTMLSelectElement;
+      const eventRelatedSelect = document.getElementById("event-related-player") as HTMLSelectElement;
+
+      let homeRoster: RosterEntry[] = [];
+      let awayRoster: RosterEntry[] = [];
+
+      if (match.homeTeamId && match.awayTeamId) {
+        [homeRoster, awayRoster] = await Promise.all([
+          api.listRoster(match.tournamentId, match.homeTeamId).catch(() => []),
+          api.listRoster(match.tournamentId, match.awayTeamId).catch(() => []),
+        ]);
+
+        // Llenar equipos
+        const homeOpt = document.createElement("option");
+        homeOpt.value = match.homeTeamId;
+        homeOpt.textContent = match.homeTeam?.name ?? "Local";
+        const awayOpt = document.createElement("option");
+        awayOpt.value = match.awayTeamId;
+        awayOpt.textContent = match.awayTeam?.name ?? "Visitante";
+        eventTeamSelect.append(homeOpt, awayOpt);
+
+        function fillPlayers(teamId: string) {
+          const roster = teamId === match.homeTeamId ? homeRoster : awayRoster;
+          eventPlayerSelect.innerHTML = '<option value="">— Seleccionar jugador —</option>';
+          eventRelatedSelect.innerHTML = '<option value="">— Ninguno —</option>';
+          for (const entry of roster) {
+            const name = entry.player
+              ? `#${entry.shirtNumber} ${entry.player.firstName} ${entry.player.lastName}`
+              : `#${entry.shirtNumber}`;
+            const opt1 = document.createElement("option");
+            opt1.value = entry.playerId;
+            opt1.textContent = name;
+            const opt2 = opt1.cloneNode(true) as HTMLOptionElement;
+            eventPlayerSelect.append(opt1);
+            eventRelatedSelect.append(opt2);
+          }
+        }
+
+        eventTeamSelect.addEventListener("change", () => {
+          if (eventTeamSelect.value) fillPlayers(eventTeamSelect.value);
+        });
+      }
+
+      // Cargar y renderizar eventos
+      let events: MatchEvent[] = await api.listMatchEvents(matchId).catch(() => []);
+
+      function renderEvents() {
+        const list = document.getElementById("events-list") as HTMLUListElement;
+        const empty = document.getElementById("events-empty") as HTMLElement;
+        list.innerHTML = "";
+        if (events.length === 0) {
+          list.append(empty);
+          empty.hidden = false;
+          return;
+        }
+        const sorted = [...events].sort((a, b) => a.minute - b.minute);
+        for (const ev of sorted) {
+          const li = document.createElement("li");
+          li.className = "flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm";
+
+          const minute = document.createElement("span");
+          minute.className = "w-12 shrink-0 font-mono text-xs font-bold text-slate-500";
+          minute.textContent = ev.addedMinute != null ? `${ev.minute}+${ev.addedMinute}'` : `${ev.minute}'`;
+
+          const icon = document.createElement("span");
+          icon.textContent = EVENT_ICON[ev.type];
+
+          const info = document.createElement("div");
+          info.className = "flex-1 min-w-0";
+          const label = document.createElement("p");
+          label.className = "font-medium text-slate-900";
+          label.textContent = `${EVENT_LABEL[ev.type]} · ${ev.player ? `${ev.player.firstName} ${ev.player.lastName}` : ""}`;
+          const teamName = document.createElement("p");
+          teamName.className = "text-xs text-slate-500";
+          teamName.textContent = ev.team?.name ?? "";
+          info.append(label, teamName);
+
+          const delBtn = document.createElement("button");
+          delBtn.className = "shrink-0 rounded-lg px-2 py-1 text-xs text-red-500 hover:bg-red-50";
+          delBtn.textContent = "Eliminar";
+          delBtn.addEventListener("click", async () => {
+            if (!confirm("¿Eliminar este evento?")) return;
+            try {
+              await api.deleteMatchEvent(token!, matchId, ev.id);
+              events = events.filter(e => e.id !== ev.id);
+              renderEvents();
+              showSuccess("Evento eliminado");
+            } catch {
+              showError("Error al eliminar evento");
+            }
+          });
+
+          li.append(minute, icon, info, delBtn);
+          list.append(li);
+        }
+      }
+
+      renderEvents();
+
+      // Agregar evento
+      const addEventBtn = document.getElementById("add-event-btn") as HTMLButtonElement;
+      addEventBtn.addEventListener("click", async () => {
+        const teamId = eventTeamSelect.value;
+        const playerId = eventPlayerSelect.value;
+        const type = (document.getElementById("event-type") as HTMLSelectElement).value;
+        const minute = parseInt((document.getElementById("event-minute") as HTMLInputElement).value);
+        const addedMinute = (document.getElementById("event-added") as HTMLInputElement).value;
+        const relatedPlayerId = eventRelatedSelect.value;
+
+        if (!teamId) return showError("Selecciona un equipo");
+        if (!playerId) return showError("Selecciona un jugador");
+        if (!minute || minute < 1) return showError("Ingresa el minuto del evento");
+
+        addEventBtn.disabled = true;
+        addEventBtn.textContent = "Agregando…";
+        try {
+          const newEvent = await api.createMatchEvent(token!, matchId, {
+            type: type as any,
+            minute,
+            addedMinute: addedMinute ? parseInt(addedMinute) : undefined,
+            teamId,
+            playerId,
+            relatedPlayerId: relatedPlayerId || undefined,
+          });
+          events.push(newEvent);
+          renderEvents();
+          // Limpiar
+          (document.getElementById("event-minute") as HTMLInputElement).value = "";
+          (document.getElementById("event-added") as HTMLInputElement).value = "";
+          eventPlayerSelect.value = "";
+          eventRelatedSelect.value = "";
+          showSuccess("✓ Evento registrado");
+        } catch (err) {
+          showError(err instanceof ApiError ? err.messages.join(" · ") : "Error al registrar evento");
+        } finally {
+          addEventBtn.disabled = false;
+          addEventBtn.textContent = "+ Agregar evento";
+        }
+      });
+
+      loading.hidden = true;
+      content.hidden = false;
+
+    } catch (err) {
+      loading.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error al cargar";
+    }
+  }
+</script>

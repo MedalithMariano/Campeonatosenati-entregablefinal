@@ -1,0 +1,226 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Nuevo Equipo">
+  <main class="mx-auto max-w-2xl px-6 py-10">
+    <a href="/equipos" class="text-sm text-slate-500 hover:text-slate-700">
+      ← Volver a equipos
+    </a>
+
+    <div class="mt-6">
+      <p class="text-sm font-medium text-indigo-600">Equipos</p>
+      <h1 class="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+        Nuevo equipo
+      </h1>
+    </div>
+
+    <div id="error-box" hidden class="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600"></div>
+
+    <form id="form" class="mt-8 space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+
+      <!-- Logo -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-2">Logo del equipo</label>
+        <div class="flex items-center gap-4">
+          <div
+            id="logo-preview"
+            class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 text-slate-400 text-xs text-center"
+          >
+            Sin logo
+          </div>
+          <div>
+            <label
+              for="logo-input"
+              class="cursor-pointer inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              📁 Seleccionar imagen
+            </label>
+            <input id="logo-input" type="file" accept="image/*" class="hidden" />
+            <p class="mt-1 text-xs text-slate-400">PNG, JPG o WEBP. Máx 5 MB.</p>
+            <p id="upload-status" class="mt-1 text-xs text-indigo-600 hidden">Subiendo imagen…</p>
+          </div>
+        </div>
+      </div>
+
+      <hr class="border-slate-100" />
+
+      <!-- Nombre -->
+      <div>
+        <label for="name" class="block text-sm font-medium text-slate-700">
+          Nombre <span class="text-red-500">*</span>
+        </label>
+        <input
+          id="name"
+          type="text"
+          required
+          placeholder="Ej: Deportivo Iquitos"
+          class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        />
+      </div>
+
+      <!-- Nombre corto -->
+      <div>
+        <label for="short-name" class="block text-sm font-medium text-slate-700">
+          Nombre corto <span class="text-slate-400 text-xs">(máx 8 caracteres)</span>
+        </label>
+        <input
+          id="short-name"
+          type="text"
+          maxlength="8"
+          placeholder="Ej: DEP"
+          class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        />
+      </div>
+
+      <!-- Ciudad y año -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="city" class="block text-sm font-medium text-slate-700">Ciudad</label>
+          <input
+            id="city"
+            type="text"
+            placeholder="Ej: Iquitos"
+            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+        <div>
+          <label for="founded-year" class="block text-sm font-medium text-slate-700">Año de fundación</label>
+          <input
+            id="founded-year"
+            type="number"
+            min="1800"
+            max="2100"
+            placeholder="Ej: 1995"
+            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+      </div>
+
+      <!-- Color -->
+      <div>
+        <label for="primary-color" class="block text-sm font-medium text-slate-700">Color principal</label>
+        <div class="mt-1 flex items-center gap-3">
+          <input
+            id="primary-color"
+            type="color"
+            value="#4f46e5"
+            class="h-10 w-14 cursor-pointer rounded-lg border border-slate-300 p-1"
+          />
+          <span id="color-hex" class="text-sm text-slate-600">#4f46e5</span>
+        </div>
+      </div>
+
+      <!-- Botones -->
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <a
+          href="/equipos"
+          class="rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          Cancelar
+        </a>
+        <button
+          id="submit-btn"
+          type="submit"
+          class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+        >
+          Guardar equipo
+        </button>
+      </div>
+    </form>
+  </main>
+</Layout>
+
+<script>
+  import { api, ApiError, auth } from "@/lib/api";
+
+  // Solo ADMIN puede acceder
+  const token = auth.requireAdmin();
+  if (!token) throw new Error("No autorizado");
+
+  // --- Referencias DOM ---
+  const form = document.getElementById("form") as HTMLFormElement;
+  const errorBox = document.getElementById("error-box") as HTMLElement;
+  const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+  const logoInput = document.getElementById("logo-input") as HTMLInputElement;
+  const logoPreview = document.getElementById("logo-preview") as HTMLElement;
+  const uploadStatus = document.getElementById("upload-status") as HTMLElement;
+  const colorInput = document.getElementById("primary-color") as HTMLInputElement;
+  const colorHex = document.getElementById("color-hex") as HTMLElement;
+
+  let uploadedLogoUrl: string | null = null;
+  let uploadedLogoPublicId: string | null = null;
+
+  // --- Preview y subida de logo ---
+  logoInput.addEventListener("change", async () => {
+    const file = logoInput.files?.[0];
+    if (!file) return;
+
+    // Preview local
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      logoPreview.innerHTML = `<img src="${e.target?.result}" class="h-full w-full object-cover" />`;
+    };
+    reader.readAsDataURL(file);
+
+    // Subir a Cloudinary
+    uploadStatus.hidden = false;
+    uploadStatus.textContent = "Subiendo imagen…";
+    try {
+      const uploaded = await api.uploadImage(token!, file, "teams");
+      uploadedLogoUrl = uploaded.url;
+      uploadedLogoPublicId = uploaded.publicId;
+      uploadStatus.textContent = "✓ Imagen subida";
+      uploadStatus.classList.replace("text-indigo-600", "text-green-600");
+    } catch {
+      uploadStatus.textContent = "Error al subir imagen";
+      uploadStatus.classList.replace("text-indigo-600", "text-red-600");
+    }
+  });
+
+  // --- Color hex display ---
+  colorInput.addEventListener("input", () => {
+    colorHex.textContent = colorInput.value;
+  });
+
+  // --- Submit ---
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorBox.hidden = true;
+
+    const name = (document.getElementById("name") as HTMLInputElement).value.trim();
+    const shortName = (document.getElementById("short-name") as HTMLInputElement).value.trim();
+    const city = (document.getElementById("city") as HTMLInputElement).value.trim();
+    const foundedYearRaw = (document.getElementById("founded-year") as HTMLInputElement).value;
+    const primaryColor = colorInput.value;
+
+    if (!name) {
+      errorBox.textContent = "El nombre del equipo es obligatorio.";
+      errorBox.hidden = false;
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Guardando…";
+
+    try {
+      await api.createTeam(token!, {
+        name,
+        shortName: shortName || undefined,
+        city: city || undefined,
+        foundedYear: foundedYearRaw ? parseInt(foundedYearRaw) : undefined,
+        primaryColor,
+        logoUrl: uploadedLogoUrl ?? undefined,
+        logoPublicId: uploadedLogoPublicId ?? undefined,
+      });
+
+      window.location.href = "/equipos";
+    } catch (err) {
+      errorBox.textContent =
+        err instanceof ApiError ? err.messages.join(" · ") : "Error al guardar";
+      errorBox.hidden = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Guardar equipo";
+    }
+  });
+</script>
